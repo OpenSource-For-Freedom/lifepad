@@ -1963,6 +1963,13 @@
                 updateCollabStatus('Waiting for answer');
                 createOfferBtn.textContent = 'Offer Created (Copied!)';
                 showToast('Offer copied to clipboard! Send it to your partner.');
+                
+                // Reset button text after 3 seconds
+                setTimeout(() => {
+                    if (createOfferBtn.textContent === 'Offer Created (Copied!)') {
+                        createOfferBtn.textContent = 'Offer Created';
+                    }
+                }, 3000);
             } catch (error) {
                 updateCollabStatus('Waiting for answer');
                 createOfferBtn.textContent = 'Offer Created';
@@ -2069,6 +2076,13 @@
                 updateCollabStatus('Connecting');
                 createAnswerBtn.textContent = 'Answer Created (Copied!)';
                 showToast('Answer copied to clipboard! Send it to the host.');
+                
+                // Reset button text after 3 seconds
+                setTimeout(() => {
+                    if (createAnswerBtn.textContent === 'Answer Created (Copied!)') {
+                        createAnswerBtn.textContent = 'Answer Created';
+                    }
+                }, 3000);
             } catch (error) {
                 updateCollabStatus('Connecting');
                 createAnswerBtn.textContent = 'Answer Created';
