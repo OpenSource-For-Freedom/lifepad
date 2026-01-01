@@ -217,11 +217,11 @@
                     <div class="info-box">
                         <p><strong>How to host:</strong></p>
                         <ol>
-                            <li>Enter a session passphrase (shared with peer)</li>
-                            <li>Click "Create offer" and wait for the offer blob</li>
-                            <li>Copy the offer blob and send it to the joiner (via chat, email, etc.)</li>
-                            <li>Paste the answer blob from the joiner below</li>
-                            <li>Click "Apply answer" to establish connection</li>
+                            <li>Enter a session passphrase (share this with your partner)</li>
+                            <li>Click "Create offer" - it will auto-copy to clipboard</li>
+                            <li>Send the copied text to your partner (via chat, email, etc.)</li>
+                            <li>When your partner sends back their response, paste it below</li>
+                            <li>Click "Connect" to establish connection</li>
                         </ol>
                     </div>
                     
@@ -233,17 +233,17 @@
                     <button id="create-offer-btn" class="primary-btn">Create Offer</button>
                     
                     <div id="offer-output" class="output-section hidden">
-                        <label>Offer Blob (send to joiner):</label>
+                        <label>Connection Data (auto-copied to clipboard):</label>
                         <textarea id="offer-blob" readonly rows="6"></textarea>
-                        <button id="copy-offer-btn" class="secondary-btn">Copy Offer</button>
+                        <button id="copy-offer-btn" class="secondary-btn">Copy Again</button>
                     </div>
                     
                     <div id="answer-input" class="input-section hidden">
                         <div class="form-group">
-                            <label for="answer-blob-input">Answer Blob (from joiner):</label>
-                            <textarea id="answer-blob-input" placeholder="Paste answer blob here" rows="6"></textarea>
+                            <label for="answer-blob-input">Response from Partner:</label>
+                            <textarea id="answer-blob-input" placeholder="Paste response text here" rows="6"></textarea>
                         </div>
-                        <button id="apply-answer-btn" class="primary-btn">Apply Answer</button>
+                        <button id="apply-answer-btn" class="primary-btn">Connect</button>
                     </div>
                 </div>
                 
@@ -252,12 +252,12 @@
                     <div class="info-box">
                         <p><strong>How to join:</strong></p>
                         <ol>
-                            <li>Enter the same passphrase as the host</li>
-                            <li>Paste the offer blob from the host</li>
-                            <li>Click "Create answer" and wait</li>
-                            <li>Copy the answer blob and send it back to the host</li>
-                                                        <li>The host can cancel the connection at any time</li>
-                            <li>Wait for host to apply answer - connection will establish - begin your session</li>
+                            <li>Get the passphrase from the host</li>
+                            <li>Enter the passphrase below</li>
+                            <li>Paste the connection text from the host</li>
+                            <li>Click "Create answer" - it will auto-copy to clipboard</li>
+                            <li>Send the copied text back to the host</li>
+                            <li>Wait for host to complete connection - session will begin</li>
                         </ol>
                     </div>
                     
@@ -267,16 +267,16 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="offer-blob-input">Offer Blob (from host):</label>
-                        <textarea id="offer-blob-input" placeholder="Paste offer blob here" rows="6"></textarea>
+                        <label for="offer-blob-input">Connection Data from Host:</label>
+                        <textarea id="offer-blob-input" placeholder="Paste connection data here" rows="6"></textarea>
                     </div>
                     
                     <button id="create-answer-btn" class="primary-btn">Create Answer</button>
                     
                     <div id="answer-output" class="output-section hidden">
-                        <label>Answer Blob (send to host):</label>
+                        <label>Response Data (auto-copied to clipboard):</label>
                         <textarea id="answer-blob" readonly rows="6"></textarea>
-                        <button id="copy-answer-btn" class="secondary-btn">Copy Answer</button>
+                        <button id="copy-answer-btn" class="secondary-btn">Copy Again</button>
                     </div>
                 </div>
             </div>

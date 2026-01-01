@@ -116,21 +116,21 @@ Two people can draw together in real-time by establishing a WebRTC connection:
 1. Click the "Collab" button in the navbar
 2. Go to the "Host Session" tab
 3. Enter a strong passphrase (shared secretly with your partner)
-4. Click "Create offer" and wait for the offer blob to appear
-5. Copy the offer blob and send it to your partner (via chat, email, etc.)
-6. Wait for your partner to send back the answer blob
-7. Paste the answer blob and click "Apply answer"
+4. Click "Create offer" - the connection data will auto-copy to clipboard
+5. Send the copied text to your partner (via chat, email, etc.)
+6. Wait for your partner to send back their response
+7. Paste the response and click "Connect"
 8. Connection will establish and you can start drawing together
 
 #### Join a Session
 
 1. Click the "Collab" button in the navbar
 2. Go to the "Join Session" tab
-3. Enter the same passphrase as the host
-4. Paste the offer blob received from the host
-5. Click "Create answer" and wait for the answer blob to appear
-6. Copy the answer blob and send it back to the host
-7. Wait for the host to apply your answer
+3. Paste the connection data received from the host
+4. Enter the same passphrase as the host
+5. Click "Create answer" - your response will auto-copy to clipboard
+6. Send the copied text back to the host
+7. Wait for the host to complete the connection
 8. Connection will establish and the canvas will sync
 
 ### Connection Status

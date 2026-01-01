@@ -40,6 +40,9 @@
         minScale: 0.1,
         maxScale: 10
     };
+    
+    // UI Constants
+    const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
 
     // DOM elements
     let canvas, ctx, canvasContainer;
@@ -271,10 +274,24 @@
         hostTabBtn.addEventListener('click', () => switchTab('host'));
         joinTabBtn.addEventListener('click', () => switchTab('join'));
         createOfferBtn.addEventListener('click', handleCreateOffer);
-        copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
+        copyOfferBtn.addEventListener('click', async () => {
+            try {
+                await copyToClipboard(offerBlob.value);
+                showToast('Copied to clipboard!');
+            } catch (error) {
+                showToast('Failed to copy - please select and copy manually');
+            }
+        });
         applyAnswerBtn.addEventListener('click', handleApplyAnswer);
         createAnswerBtn.addEventListener('click', handleCreateAnswer);
-        copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
+        copyAnswerBtn.addEventListener('click', async () => {
+            try {
+                await copyToClipboard(answerBlob.value);
+                showToast('Copied to clipboard!');
+            } catch (error) {
+                showToast('Failed to copy - please select and copy manually');
+            }
+        });
         disconnectBtn.addEventListener('click', handleDisconnect);
 
         // Tools dropdown
@@ -1932,18 +1949,35 @@
             
             clearCollabError();
             createOfferBtn.disabled = true;
-            createOfferBtn.textContent = 'Creating offer...';
+            createOfferBtn.textContent = 'Creating...';
             updateCollabStatus('Creating offer');
             
             const offerBlobObj = await RTC.createOffer(passphrase);
             
-            offerBlob.value = JSON.stringify(offerBlobObj, null, 2);
+            const offerText = JSON.stringify(offerBlobObj, null, 2);
+            offerBlob.value = offerText;
             offerOutput.classList.remove('hidden');
             answerInput.classList.remove('hidden');
             disconnectBtn.classList.remove('hidden');
             
-            updateCollabStatus('Waiting for answer');
-            createOfferBtn.textContent = 'Offer Created';
+            // Auto-copy to clipboard
+            try {
+                await copyToClipboard(offerText);
+                updateCollabStatus('Waiting for answer');
+                createOfferBtn.textContent = 'Offer Created (Copied!)';
+                showToast('Offer copied to clipboard! Send it to your partner.');
+                
+                // Reset button text after delay
+                setTimeout(() => {
+                    if (createOfferBtn.textContent === 'Offer Created (Copied!)') {
+                        createOfferBtn.textContent = 'Offer Created';
+                    }
+                }, BUTTON_RESET_DELAY);
+            } catch (error) {
+                updateCollabStatus('Waiting for answer');
+                createOfferBtn.textContent = 'Offer Created';
+                showToast('Offer created. Please copy it manually and send to your partner.');
+            }
             
         } catch (error) {
             console.error('Create offer error:', error);
@@ -1959,7 +1993,7 @@
             const answerText = answerBlobInput.value.trim();
             
             if (!answerText) {
-                showCollabError('Please paste the answer blob');
+                showCollabError('Please paste the response data');
                 return;
             }
             
@@ -1967,30 +2001,37 @@
             try {
                 answerBlobObj = JSON.parse(answerText);
             } catch (e) {
-                showCollabError('Invalid answer blob format');
+                showCollabError('Invalid response data format');
                 return;
             }
             
             if (answerBlobObj.app !== 'lifePAD' || answerBlobObj.v !== 1 || answerBlobObj.type !== 'answer') {
-                showCollabError('Invalid answer blob - wrong app or version');
+                showCollabError('Invalid response data - please check and try again');
                 return;
             }
             
             clearCollabError();
             applyAnswerBtn.disabled = true;
-            applyAnswerBtn.textContent = 'Applying...';
+            applyAnswerBtn.textContent = 'Connecting...';
             updateCollabStatus('Connecting');
             
             await RTC.applyAnswer(answerBlobObj);
             
-            applyAnswerBtn.textContent = 'Answer Applied';
-            showToast('Waiting for connection to establish');
+            applyAnswerBtn.textContent = 'Connected!';
+            showToast('Connection established - start drawing!');
+            
+            // Reset button text after delay
+            setTimeout(() => {
+                if (applyAnswerBtn.textContent === 'Connected!') {
+                    applyAnswerBtn.textContent = 'Connect';
+                }
+            }, BUTTON_RESET_DELAY);
             
         } catch (error) {
             console.error('Apply answer error:', error);
             showCollabError('Failed to apply answer: ' + error.message);
             applyAnswerBtn.disabled = false;
-            applyAnswerBtn.textContent = 'Apply Answer';
+            applyAnswerBtn.textContent = 'Connect';
         }
     }
     
@@ -2010,7 +2051,7 @@
             }
             
             if (!offerText) {
-                showCollabError('Please paste the offer blob');
+                showCollabError('Please paste the connection data');
                 return;
             }
             
@@ -2018,29 +2059,45 @@
             try {
                 offerBlobObj = JSON.parse(offerText);
             } catch (e) {
-                showCollabError('Invalid offer blob format');
+                showCollabError('Invalid connection data format');
                 return;
             }
             
             if (offerBlobObj.app !== 'lifePAD' || offerBlobObj.v !== 1 || offerBlobObj.type !== 'offer') {
-                showCollabError('Invalid offer blob - wrong app or version');
+                showCollabError('Invalid connection data - please check and try again');
                 return;
             }
             
             clearCollabError();
             createAnswerBtn.disabled = true;
-            createAnswerBtn.textContent = 'Creating answer...';
+            createAnswerBtn.textContent = 'Creating...';
             updateCollabStatus('Ready to join');
             
             const answerBlobObj = await RTC.createAnswer(passphrase, offerBlobObj);
             
-            answerBlob.value = JSON.stringify(answerBlobObj, null, 2);
+            const answerText = JSON.stringify(answerBlobObj, null, 2);
+            answerBlob.value = answerText;
             answerOutput.classList.remove('hidden');
             disconnectBtn.classList.remove('hidden');
             
-            updateCollabStatus('Connecting');
-            createAnswerBtn.textContent = 'Answer Created';
-            showToast('Send answer blob to host to complete connection');
+            // Auto-copy to clipboard
+            try {
+                await copyToClipboard(answerText);
+                updateCollabStatus('Connecting');
+                createAnswerBtn.textContent = 'Answer Created (Copied!)';
+                showToast('Answer copied to clipboard! Send it to the host.');
+                
+                // Reset button text after delay
+                setTimeout(() => {
+                    if (createAnswerBtn.textContent === 'Answer Created (Copied!)') {
+                        createAnswerBtn.textContent = 'Answer Created';
+                    }
+                }, BUTTON_RESET_DELAY);
+            } catch (error) {
+                updateCollabStatus('Connecting');
+                createAnswerBtn.textContent = 'Answer Created';
+                showToast('Answer created. Please copy it manually and send to the host.');
+            }
             
         } catch (error) {
             console.error('Create answer error:', error);
@@ -2070,7 +2127,7 @@
         createOfferBtn.disabled = false;
         createOfferBtn.textContent = 'Create Offer';
         applyAnswerBtn.disabled = false;
-        applyAnswerBtn.textContent = 'Apply Answer';
+        applyAnswerBtn.textContent = 'Connect';
         createAnswerBtn.disabled = false;
         createAnswerBtn.textContent = 'Create Answer';
         
@@ -2102,22 +2159,26 @@
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(text);
-                showToast('Copied to clipboard');
-            } else {
-                // Fallback for older browsers
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showToast('Copied to clipboard');
+                return; // Success
             }
         } catch (error) {
-            showToast('Failed to copy - please select and copy manually');
+            // Modern API failed, try fallback
         }
+        
+        // Fallback for older browsers or when modern API fails
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        if (!success) {
+            throw new Error('Copy command failed');
+        }
+        // Caller handles success/error messages
     }
 
     // ============================================
