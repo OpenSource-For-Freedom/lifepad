@@ -2111,7 +2111,7 @@
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 await navigator.clipboard.writeText(text);
-                showToast('Copied to clipboard');
+                // Toast message handled by caller for context-specific messages
             } else {
                 // Fallback for older browsers
                 const textarea = document.createElement('textarea');
@@ -2122,7 +2122,7 @@
                 textarea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textarea);
-                showToast('Copied to clipboard');
+                // Toast message handled by caller for context-specific messages
             }
         } catch (error) {
             showToast('Failed to copy - please select and copy manually');
