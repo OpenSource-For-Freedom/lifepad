@@ -112,6 +112,7 @@
         // Collaboration elements
         collabBtn = document.getElementById('collab-btn');
         collabModal = document.getElementById('collab-modal');
+        closeCollabModal = document.getElementById('close-collab-modal');
         collabStatus = document.getElementById('collab-status');
         collabError = document.getElementById('collab-error');
         hostTab = document.getElementById('host-tab');
