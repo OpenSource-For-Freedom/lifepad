@@ -370,6 +370,16 @@ html, body {
     cursor: crosshair;
 }
 
+#overlay-canvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    touch-action: none;
+    pointer-events: none;
+    z-index: 5;
+}
+
 #canvas-container.paper-mode {
     background: var(--paper-bg);
 }
@@ -469,9 +479,10 @@ html, body {
 /* Collaboration Status */
 .collab-status-section {
     margin-left: auto;
+    gap: 12px;
 }
 
-.collab-status {
+.collab-status, .tool-status {
     display: inline-block;
     padding: 6px 12px;
     border-radius: 12px;
