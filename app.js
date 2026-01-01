@@ -17,7 +17,12 @@
         historyStep: -1,
         maxHistory: 30,
         paperMode: false,
-        theme: 'light'
+        theme: 'light',
+        currentShape: null,
+        shapeFill: false,
+        isDrawingShape: false,
+        shapeStartX: 0,
+        shapeStartY: 0
     };
 
     // DOM elements
@@ -28,6 +33,9 @@
     let undoBtn, redoBtn, clearBtn, saveBtn, helpBtn;
     let themeToggleBtn, paperBgCheckbox;
     let toast;
+    let toolsBtn, toolsMenu, shapesBtn, rulerBtn;
+    let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox;
+    let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler;
 
     // Initialize app
     function init() {
@@ -53,6 +61,18 @@
         paperBgCheckbox = document.getElementById('paper-bg');
         toast = document.getElementById('toast');
         colorSwatches = document.querySelectorAll('.color-swatch');
+        toolsBtn = document.getElementById('tools-btn');
+        toolsMenu = document.getElementById('tools-menu');
+        shapesBtn = document.getElementById('shapes-btn');
+        rulerBtn = document.getElementById('ruler-btn');
+        shapesPanel = document.getElementById('shapes-panel');
+        closeShapesBtn = document.getElementById('close-shapes');
+        shapeButtons = document.querySelectorAll('.shape-btn');
+        shapeFillCheckbox = document.getElementById('shape-fill');
+        rulerOverlay = document.getElementById('ruler-overlay');
+        closeRulerBtn = document.getElementById('close-ruler');
+        horizontalRuler = document.getElementById('horizontal-ruler');
+        verticalRuler = document.getElementById('vertical-ruler');
 
         // Setup canvas
         setupCanvas();
@@ -147,6 +167,32 @@
         themeToggleBtn.addEventListener('click', toggleTheme);
         paperBgCheckbox.addEventListener('change', togglePaperMode);
 
+        // Tools dropdown
+        toolsBtn.addEventListener('click', toggleToolsMenu);
+        shapesBtn.addEventListener('click', openShapesPanel);
+        rulerBtn.addEventListener('click', openRuler);
+
+        // Shapes panel
+        closeShapesBtn.addEventListener('click', closeShapesPanel);
+        shapeButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                selectShape(this.dataset.shape);
+            });
+        });
+        shapeFillCheckbox.addEventListener('change', function() {
+            state.shapeFill = this.checked;
+        });
+
+        // Ruler
+        closeRulerBtn.addEventListener('click', closeRuler);
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!toolsBtn.contains(e.target) && !toolsMenu.contains(e.target)) {
+                toolsMenu.classList.remove('show');
+            }
+        });
+
         // Drawing events - using Pointer Events for universal support
         canvas.addEventListener('pointerdown', startDrawing);
         canvas.addEventListener('pointermove', draw);
@@ -183,23 +229,52 @@
     // Drawing functions
     function startDrawing(e) {
         e.preventDefault();
-        state.isDrawing = true;
         
         const rect = canvas.getBoundingClientRect();
-        state.lastX = e.clientX - rect.left;
-        state.lastY = e.clientY - rect.top;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
         
-        // Save state for undo
-        saveHistoryState();
-        
-        // Start path
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        if (state.currentShape) {
+            // Drawing a shape
+            state.isDrawingShape = true;
+            state.shapeStartX = x;
+            state.shapeStartY = y;
+            saveHistoryState();
+        } else {
+            // Normal drawing
+            state.isDrawing = true;
+            state.lastX = x;
+            state.lastY = y;
+            
+            // Save state for undo
+            saveHistoryState();
+            
+            // Start path
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+        }
     }
 
     function draw(e) {
-        if (!state.isDrawing) return;
         e.preventDefault();
+        
+        if (state.isDrawingShape) {
+            // Preview shape while dragging
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Restore previous state to clear preview
+            if (state.historyStep >= 0) {
+                restoreHistoryState(state.history[state.historyStep]);
+            }
+            
+            // Draw shape preview
+            drawShape(state.shapeStartX, state.shapeStartY, x, y, state.currentShape, true);
+            return;
+        }
+        
+        if (!state.isDrawing) return;
         
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -239,9 +314,26 @@
     }
 
     function stopDrawing(e) {
-        if (!state.isDrawing) return;
+        if (!state.isDrawing && !state.isDrawingShape) return;
         e.preventDefault();
-        state.isDrawing = false;
+        
+        if (state.isDrawingShape) {
+            // Finalize shape
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Restore to clear preview
+            if (state.historyStep >= 0) {
+                restoreHistoryState(state.history[state.historyStep]);
+            }
+            
+            // Draw final shape
+            drawShape(state.shapeStartX, state.shapeStartY, x, y, state.currentShape, false);
+            state.isDrawingShape = false;
+        } else {
+            state.isDrawing = false;
+        }
         
         // Autosave after stroke
         saveCanvasToStorage();
@@ -535,6 +627,244 @@
                 toast.textContent = '';
             }, 300);
         }, 3000);
+    }
+
+    // Tools dropdown
+    function toggleToolsMenu(e) {
+        e.stopPropagation();
+        toolsMenu.classList.toggle('show');
+    }
+
+    // Shapes panel
+    function openShapesPanel() {
+        shapesPanel.classList.remove('hidden');
+        toolsMenu.classList.remove('show');
+        showToast('Click and drag to draw shapes');
+    }
+
+    function closeShapesPanel() {
+        shapesPanel.classList.add('hidden');
+        state.currentShape = null;
+        shapeButtons.forEach(btn => btn.classList.remove('active'));
+    }
+
+    function selectShape(shape) {
+        state.currentShape = shape;
+        shapeButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.shape === shape);
+        });
+        showToast(`Selected: ${shape}`);
+    }
+
+    function drawShape(x1, y1, x2, y2, shape, isPreview) {
+        const width = x2 - x1;
+        const height = y2 - y1;
+        
+        ctx.strokeStyle = state.currentColor;
+        ctx.lineWidth = state.currentSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        if (state.shapeFill) {
+            ctx.fillStyle = state.currentColor;
+        }
+        
+        if (isPreview) {
+            ctx.globalAlpha = 0.5;
+        } else {
+            ctx.globalAlpha = 1;
+        }
+        
+        ctx.beginPath();
+        
+        switch (shape) {
+            case 'rectangle':
+                if (state.shapeFill) {
+                    ctx.fillRect(x1, y1, width, height);
+                } else {
+                    ctx.strokeRect(x1, y1, width, height);
+                }
+                break;
+                
+            case 'circle':
+                const radiusX = Math.abs(width) / 2;
+                const radiusY = Math.abs(height) / 2;
+                const centerX = x1 + width / 2;
+                const centerY = y1 + height / 2;
+                
+                ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                if (state.shapeFill) {
+                    ctx.fill();
+                } else {
+                    ctx.stroke();
+                }
+                break;
+                
+            case 'line':
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                break;
+                
+            case 'triangle':
+                const topX = x1 + width / 2;
+                const topY = y1;
+                const leftX = x1;
+                const leftY = y2;
+                const rightX = x2;
+                const rightY = y2;
+                
+                ctx.moveTo(topX, topY);
+                ctx.lineTo(leftX, leftY);
+                ctx.lineTo(rightX, rightY);
+                ctx.closePath();
+                
+                if (state.shapeFill) {
+                    ctx.fill();
+                } else {
+                    ctx.stroke();
+                }
+                break;
+                
+            case 'arrow':
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                const headLength = Math.min(20, Math.abs(width) / 3, Math.abs(height) / 3);
+                
+                // Draw line
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                
+                // Draw arrowhead
+                ctx.beginPath();
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headLength * Math.cos(angle - Math.PI / 6),
+                    y2 - headLength * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.moveTo(x2, y2);
+                ctx.lineTo(
+                    x2 - headLength * Math.cos(angle + Math.PI / 6),
+                    y2 - headLength * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.stroke();
+                break;
+                
+            case 'star':
+                const centerStarX = x1 + width / 2;
+                const centerStarY = y1 + height / 2;
+                const outerRadius = Math.min(Math.abs(width), Math.abs(height)) / 2;
+                const innerRadius = outerRadius / 2;
+                const spikes = 5;
+                
+                for (let i = 0; i < spikes * 2; i++) {
+                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                    const angle = (i * Math.PI) / spikes - Math.PI / 2;
+                    const px = centerStarX + radius * Math.cos(angle);
+                    const py = centerStarY + radius * Math.sin(angle);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(px, py);
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+                ctx.closePath();
+                
+                if (state.shapeFill) {
+                    ctx.fill();
+                } else {
+                    ctx.stroke();
+                }
+                break;
+        }
+        
+        ctx.globalAlpha = 1;
+    }
+
+    // Ruler
+    function openRuler() {
+        rulerOverlay.classList.remove('hidden');
+        toolsMenu.classList.remove('show');
+        initializeRulers();
+        showToast('Use rulers to measure distances');
+    }
+
+    function closeRuler() {
+        rulerOverlay.classList.add('hidden');
+    }
+
+    function initializeRulers() {
+        // Create measurements for horizontal ruler
+        const hMeasurements = horizontalRuler.querySelector('.ruler-measurements');
+        hMeasurements.innerHTML = '';
+        
+        const hWidth = 600;
+        const hInterval = 50; // pixels between marks
+        
+        for (let i = 0; i <= hWidth; i += hInterval) {
+            const mark = document.createElement('div');
+            mark.style.cssText = `
+                position: absolute;
+                left: ${i}px;
+                top: 0;
+                width: 2px;
+                height: ${i % 100 === 0 ? '30px' : '20px'};
+                background: white;
+            `;
+            
+            if (i % 100 === 0) {
+                const label = document.createElement('span');
+                label.textContent = i;
+                label.style.cssText = `
+                    position: absolute;
+                    left: ${i + 5}px;
+                    top: 5px;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: bold;
+                `;
+                hMeasurements.appendChild(label);
+            }
+            
+            hMeasurements.appendChild(mark);
+        }
+        
+        // Create measurements for vertical ruler
+        const vMeasurements = verticalRuler.querySelector('.ruler-measurements');
+        vMeasurements.innerHTML = '';
+        
+        const vHeight = 600;
+        const vInterval = 50;
+        
+        for (let i = 0; i <= vHeight; i += vInterval) {
+            const mark = document.createElement('div');
+            mark.style.cssText = `
+                position: absolute;
+                top: ${i}px;
+                left: 0;
+                height: 2px;
+                width: ${i % 100 === 0 ? '30px' : '20px'};
+                background: white;
+            `;
+            
+            if (i % 100 === 0) {
+                const label = document.createElement('span');
+                label.textContent = i;
+                label.style.cssText = `
+                    position: absolute;
+                    top: ${i + 5}px;
+                    left: 5px;
+                    color: white;
+                    font-size: 11px;
+                    font-weight: bold;
+                    writing-mode: vertical-rl;
+                `;
+                vMeasurements.appendChild(label);
+            }
+            
+            vMeasurements.appendChild(mark);
+        }
     }
 
     // Service Worker registration

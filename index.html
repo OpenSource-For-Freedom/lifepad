@@ -92,6 +92,13 @@
                 <button id="redo-btn" class="tool-btn" title="Redo">Redo</button>
                 <button id="clear-btn" class="tool-btn" title="Clear canvas">Clear</button>
                 <button id="save-btn" class="tool-btn primary" title="Save as PNG">Save PNG</button>
+                <div class="tools-dropdown">
+                    <button id="tools-btn" class="tool-btn" title="Tools">Tools ▼</button>
+                    <div id="tools-menu" class="dropdown-menu">
+                        <button id="shapes-btn" class="dropdown-item">Shapes</button>
+                        <button id="ruler-btn" class="dropdown-item">Ruler</button>
+                    </div>
+                </div>
                 <button id="help-btn" class="tool-btn" title="Help">Help</button>
             </div>
 
@@ -107,6 +114,39 @@
         <!-- Canvas Container -->
         <div id="canvas-container">
             <canvas id="drawing-canvas"></canvas>
+            <!-- Shapes Panel -->
+            <div id="shapes-panel" class="shapes-panel hidden">
+                <div class="panel-header">
+                    <h3>Shapes</h3>
+                    <button id="close-shapes" class="close-btn">✕</button>
+                </div>
+                <div class="shapes-grid">
+                    <button class="shape-btn" data-shape="rectangle" title="Rectangle">▭</button>
+                    <button class="shape-btn" data-shape="circle" title="Circle">○</button>
+                    <button class="shape-btn" data-shape="line" title="Line">/</button>
+                    <button class="shape-btn" data-shape="triangle" title="Triangle">△</button>
+                    <button class="shape-btn" data-shape="arrow" title="Arrow">→</button>
+                    <button class="shape-btn" data-shape="star" title="Star">★</button>
+                </div>
+                <div class="shape-controls">
+                    <label>
+                        <input type="checkbox" id="shape-fill" />
+                        <span>Fill shape</span>
+                    </label>
+                </div>
+            </div>
+            <!-- Ruler Overlay -->
+            <div id="ruler-overlay" class="ruler-overlay hidden">
+                <div class="ruler-container">
+                    <div class="ruler horizontal-ruler" id="horizontal-ruler">
+                        <div class="ruler-measurements"></div>
+                    </div>
+                    <div class="ruler vertical-ruler" id="vertical-ruler">
+                        <div class="ruler-measurements"></div>
+                    </div>
+                </div>
+                <button id="close-ruler" class="close-ruler-btn">Close Ruler</button>
+            </div>
         </div>
     </div>
 
