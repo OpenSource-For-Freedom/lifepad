@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="lifePAD - Primary Artistry Device. A simple sketch pad for touch and stylus.">
+    <meta name="theme-color" content="#2a2d3a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>lifePAD</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Intro Overlay -->
+    <div id="intro-overlay" class="intro-overlay">
+        <div class="intro-content">
+            <div class="intro-header">
+                <h1>lifePAD</h1>
+                <p class="subtitle">Primary Artistry Device</p>
+            </div>
+            
+            <div class="intro-sections">
+                <section>
+                    <h2>What it is</h2>
+                    <p>A simple sketch pad that works with touch and stylus input on any device.</p>
+                </section>
+                
+                <section>
+                    <h2>What you can do</h2>
+                    <p>Draw with different colors and textures, erase mistakes, undo and redo your strokes, and save your artwork as PNG images.</p>
+                </section>
+                
+                <section>
+                    <h2>Privacy</h2>
+                    <p>Everything stays on your device. No accounts needed. No data sent anywhere. Works completely offline.</p>
+                </section>
+            </div>
+            
+            <div class="intro-actions">
+                <button id="start-drawing" class="primary-btn">Start drawing</button>
+                <button id="sample-canvas" class="secondary-btn">Open sample canvas</button>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="dont-show-again">
+                    <span>Do not show again</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <!-- Top Navbar -->
+        <nav class="navbar">
+            <div class="nav-section colors-section">
+                <label>Colors:</label>
+                <div class="color-swatches">
+                    <button class="color-swatch active" data-color="#000000" style="background: #000000;" title="Black"></button>
+                    <button class="color-swatch" data-color="#ff4444" style="background: #ff4444;" title="Red"></button>
+                    <button class="color-swatch" data-color="#4488ff" style="background: #4488ff;" title="Blue"></button>
+                    <button class="color-swatch" data-color="#44cc44" style="background: #44cc44;" title="Green"></button>
+                    <button class="color-swatch" data-color="#ffcc44" style="background: #ffcc44;" title="Yellow"></button>
+                    <button class="color-swatch" data-color="#ff8844" style="background: #ff8844;" title="Orange"></button>
+                    <button class="color-swatch" data-color="#cc44cc" style="background: #cc44cc;" title="Purple"></button>
+                    <button class="color-swatch" data-color="#ffffff" style="background: #ffffff; border: 1px solid #ccc;" title="White"></button>
+                    <input type="color" id="custom-color" value="#000000" title="Custom color">
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <label for="pen-size">Size:</label>
+                <input type="range" id="pen-size" min="1" max="48" value="4" step="1">
+                <span id="pen-size-value">4</span>
+            </div>
+
+            <div class="nav-section">
+                <label for="brush-texture">Texture:</label>
+                <select id="brush-texture">
+                    <option value="ink">Ink</option>
+                    <option value="pencil">Pencil</option>
+                    <option value="marker">Marker</option>
+                    <option value="spray">Spray</option>
+                    <option value="charcoal">Charcoal</option>
+                </select>
+            </div>
+
+            <div class="nav-section actions-section">
+                <button id="brush-eraser-toggle" class="tool-btn" title="Toggle Brush/Eraser">Brush</button>
+                <button id="undo-btn" class="tool-btn" title="Undo">Undo</button>
+                <button id="redo-btn" class="tool-btn" title="Redo">Redo</button>
+                <button id="clear-btn" class="tool-btn" title="Clear canvas">Clear</button>
+                <button id="save-btn" class="tool-btn primary" title="Save as PNG">Save PNG</button>
+                <button id="help-btn" class="tool-btn" title="Help">Help</button>
+            </div>
+
+            <div class="nav-section settings-section">
+                <button id="theme-toggle" class="tool-btn" title="Toggle theme">Theme</button>
+                <label class="checkbox-label small">
+                    <input type="checkbox" id="paper-bg">
+                    <span>Paper</span>
+                </label>
+            </div>
+        </nav>
+
+        <!-- Canvas Container -->
+        <div id="canvas-container">
+            <canvas id="drawing-canvas"></canvas>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
