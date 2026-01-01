@@ -1944,11 +1944,16 @@
             disconnectBtn.classList.remove('hidden');
             
             // Auto-copy to clipboard
-            await copyToClipboard(offerText);
-            
-            updateCollabStatus('Waiting for answer');
-            createOfferBtn.textContent = 'Offer Created (Copied!)';
-            showToast('Offer copied to clipboard! Send it to your partner.');
+            try {
+                await copyToClipboard(offerText);
+                updateCollabStatus('Waiting for answer');
+                createOfferBtn.textContent = 'Offer Created (Copied!)';
+                showToast('Offer copied to clipboard! Send it to your partner.');
+            } catch (error) {
+                updateCollabStatus('Waiting for answer');
+                createOfferBtn.textContent = 'Offer Created';
+                showToast('Offer created. Please copy it manually and send to your partner.');
+            }
             
         } catch (error) {
             console.error('Create offer error:', error);
@@ -2045,11 +2050,16 @@
             disconnectBtn.classList.remove('hidden');
             
             // Auto-copy to clipboard
-            await copyToClipboard(answerText);
-            
-            updateCollabStatus('Connecting');
-            createAnswerBtn.textContent = 'Answer Created (Copied!)';
-            showToast('Answer copied to clipboard! Send it to the host.');
+            try {
+                await copyToClipboard(answerText);
+                updateCollabStatus('Connecting');
+                createAnswerBtn.textContent = 'Answer Created (Copied!)';
+                showToast('Answer copied to clipboard! Send it to the host.');
+            } catch (error) {
+                updateCollabStatus('Connecting');
+                createAnswerBtn.textContent = 'Answer Created';
+                showToast('Answer created. Please copy it manually and send to the host.');
+            }
             
         } catch (error) {
             console.error('Create answer error:', error);
