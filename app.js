@@ -40,6 +40,9 @@
         minScale: 0.1,
         maxScale: 10
     };
+    
+    // UI Constants
+    const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
 
     // DOM elements
     let canvas, ctx, canvasContainer;
@@ -1964,12 +1967,12 @@
                 createOfferBtn.textContent = 'Offer Created (Copied!)';
                 showToast('Offer copied to clipboard! Send it to your partner.');
                 
-                // Reset button text after 3 seconds
+                // Reset button text after delay
                 setTimeout(() => {
                     if (createOfferBtn.textContent === 'Offer Created (Copied!)') {
                         createOfferBtn.textContent = 'Offer Created';
                     }
-                }, 3000);
+                }, BUTTON_RESET_DELAY);
             } catch (error) {
                 updateCollabStatus('Waiting for answer');
                 createOfferBtn.textContent = 'Offer Created';
@@ -2016,6 +2019,13 @@
             
             applyAnswerBtn.textContent = 'Connected!';
             showToast('Connection established - start drawing!');
+            
+            // Reset button text after delay
+            setTimeout(() => {
+                if (applyAnswerBtn.textContent === 'Connected!') {
+                    applyAnswerBtn.textContent = 'Connect';
+                }
+            }, BUTTON_RESET_DELAY);
             
         } catch (error) {
             console.error('Apply answer error:', error);
@@ -2077,12 +2087,12 @@
                 createAnswerBtn.textContent = 'Answer Created (Copied!)';
                 showToast('Answer copied to clipboard! Send it to the host.');
                 
-                // Reset button text after 3 seconds
+                // Reset button text after delay
                 setTimeout(() => {
                     if (createAnswerBtn.textContent === 'Answer Created (Copied!)') {
                         createAnswerBtn.textContent = 'Answer Created';
                     }
-                }, 3000);
+                }, BUTTON_RESET_DELAY);
             } catch (error) {
                 updateCollabStatus('Connecting');
                 createAnswerBtn.textContent = 'Answer Created';
