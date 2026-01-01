@@ -983,6 +983,9 @@
         salt: null,
         handshakeComplete: false,
         
+        // Configuration constants
+        ICE_GATHERING_TIMEOUT: 30000, // 30 seconds
+        
         // STUN server configuration
         stunServers: [
             'stun:stun.l.google.com:19302',
@@ -1136,7 +1139,7 @@
                 
                 const timeout = setTimeout(() => {
                     reject(new Error('ICE gathering timeout'));
-                }, 30000); // 30 second timeout
+                }, this.ICE_GATHERING_TIMEOUT);
                 
                 this.peerConnection.addEventListener('icegatheringstatechange', () => {
                     if (this.peerConnection.iceGatheringState === 'complete') {
@@ -1272,10 +1275,11 @@
         maxEvents: 1000,
         currentStrokeId: null,
         processedEventIds: new Set(),
+        strokeBeginEvents: new Map(), // Cache for stroke begin events by ID
         
         // Generate unique event ID
         generateEventId() {
-            return Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            return Date.now() + '_' + Math.random().toString(36).slice(2, 11);
         },
         
         // Normalize point to 0..1 range
@@ -1318,6 +1322,7 @@
             };
             
             this.currentStrokeId = event.id;
+            this.strokeBeginEvents.set(event.id, event);
             this.addEvent(event);
             return event;
         },
@@ -1432,10 +1437,12 @@
             }
             this.processedEventIds.add(eventKey);
             
-            // Limit processed IDs set size
+            // Limit processed IDs set size with FIFO approach
             if (this.processedEventIds.size > this.maxEvents) {
-                const firstKey = this.processedEventIds.values().next().value;
-                this.processedEventIds.delete(firstKey);
+                // Convert to array, remove oldest items, convert back
+                const ids = Array.from(this.processedEventIds);
+                const toRemove = ids.slice(0, this.processedEventIds.size - this.maxEvents);
+                toRemove.forEach(id => this.processedEventIds.delete(id));
             }
             
             this.replayEvent(event);
@@ -1445,6 +1452,9 @@
         replayEvent(event) {
             if (event.type === 'stroke_begin') {
                 const point = this.denormalizePoint(event.p.x, event.p.y);
+                
+                // Cache the begin event for later lookup
+                this.strokeBeginEvents.set(event.id, event);
                 
                 // Set brush state
                 state.lastX = point.x;
@@ -1458,12 +1468,9 @@
                 
                 // Draw stroke segment
                 const pressure = event.p.pressure || 1;
-                const size = event.brush?.size || state.currentSize;
                 
-                // Get brush from stroke_begin event
-                const beginEvent = this.eventLog.find(e => 
-                    e.id === event.id && e.type === 'stroke_begin'
-                );
+                // Get brush from cached begin event
+                const beginEvent = this.strokeBeginEvents.get(event.id);
                 
                 if (beginEvent) {
                     // Draw with remote brush settings
@@ -1481,6 +1488,9 @@
                 state.lastY = point.y;
                 
             } else if (event.type === 'stroke_end') {
+                // Clean up cached begin event
+                this.strokeBeginEvents.delete(event.id);
+                
                 // Autosave
                 saveCanvasToStorage();
                 
