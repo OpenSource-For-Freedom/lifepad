@@ -2,6 +2,8 @@
 
 Primary Artistry Device - A simple, mobile-first sketch pad that works with touch and stylus.
 
+https://opensource-for-freedom.github.io/lifepad/
+
 ## What is lifePAD?
 
 lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing experience. It works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, note-taking, or artistic expression on the go.
