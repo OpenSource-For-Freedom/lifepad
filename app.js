@@ -20,9 +20,15 @@
         theme: 'light',
         currentShape: null,
         shapeFill: false,
+        shapeRough: false,
         isDrawingShape: false,
         shapeStartX: 0,
-        shapeStartY: 0
+        shapeStartY: 0,
+        currentTool: 'brush', // 'brush', 'select', 'text', 'shape'
+        selectedObject: null,
+        objects: [], // Array of drawable objects (shapes, text)
+        textX: 0,
+        textY: 0
     };
 
     // DOM elements
@@ -33,9 +39,18 @@
     let undoBtn, redoBtn, clearBtn, saveBtn, helpBtn;
     let themeToggleBtn, paperBgCheckbox;
     let toast;
-    let toolsBtn, toolsMenu, shapesBtn, rulerBtn;
-    let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox;
+    let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
+    let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler;
+    let selectToolBtn, textToolBtn;
+    let textDialog, textInput, textConfirmBtn, textCancelBtn;
+    let collabBtn, collabModal, collabStatus, closeCollabModal;
+    let hostTabBtn, joinTabBtn, hostTab, joinTab;
+    let createOfferBtn, copyOfferBtn, offerBlob, offerOutput;
+    let answerBlobInput, applyAnswerBtn, answerInput;
+    let createAnswerBtn, copyAnswerBtn, answerBlob, answerOutput;
+    let hostPassphrase, joinPassphrase, offerBlobInput;
+    let disconnectBtn, collabError;
 
     // Initialize app
     function init() {
@@ -65,14 +80,48 @@
         toolsMenu = document.getElementById('tools-menu');
         shapesBtn = document.getElementById('shapes-btn');
         rulerBtn = document.getElementById('ruler-btn');
+        exportSvgBtn = document.getElementById('export-svg-btn');
         shapesPanel = document.getElementById('shapes-panel');
         closeShapesBtn = document.getElementById('close-shapes');
         shapeButtons = document.querySelectorAll('.shape-btn');
         shapeFillCheckbox = document.getElementById('shape-fill');
+        shapeRoughCheckbox = document.getElementById('shape-rough');
         rulerOverlay = document.getElementById('ruler-overlay');
         closeRulerBtn = document.getElementById('close-ruler');
         horizontalRuler = document.getElementById('horizontal-ruler');
         verticalRuler = document.getElementById('vertical-ruler');
+        selectToolBtn = document.getElementById('select-tool');
+        textToolBtn = document.getElementById('text-tool');
+        textDialog = document.getElementById('text-dialog');
+        textInput = document.getElementById('text-input');
+        textConfirmBtn = document.getElementById('text-confirm');
+        textCancelBtn = document.getElementById('text-cancel');
+        
+        // Collaboration elements
+        collabBtn = document.getElementById('collab-btn');
+        collabModal = document.getElementById('collab-modal');
+        collabStatus = document.getElementById('collab-status');
+        closeCollabModal = document.getElementById('close-collab-modal');
+        hostTabBtn = document.querySelector('[data-tab="host"]');
+        joinTabBtn = document.querySelector('[data-tab="join"]');
+        hostTab = document.getElementById('host-tab');
+        joinTab = document.getElementById('join-tab');
+        createOfferBtn = document.getElementById('create-offer-btn');
+        copyOfferBtn = document.getElementById('copy-offer-btn');
+        offerBlob = document.getElementById('offer-blob');
+        offerOutput = document.getElementById('offer-output');
+        answerBlobInput = document.getElementById('answer-blob-input');
+        applyAnswerBtn = document.getElementById('apply-answer-btn');
+        answerInput = document.getElementById('answer-input');
+        createAnswerBtn = document.getElementById('create-answer-btn');
+        copyAnswerBtn = document.getElementById('copy-answer-btn');
+        answerBlob = document.getElementById('answer-blob');
+        answerOutput = document.getElementById('answer-output');
+        hostPassphrase = document.getElementById('host-passphrase');
+        joinPassphrase = document.getElementById('join-passphrase');
+        offerBlobInput = document.getElementById('offer-blob-input');
+        disconnectBtn = document.getElementById('disconnect-btn');
+        collabError = document.getElementById('collab-error');
 
         // Setup canvas
         setupCanvas();
@@ -183,6 +232,11 @@
         toolsBtn.addEventListener('click', toggleToolsMenu);
         shapesBtn.addEventListener('click', openShapesPanel);
         rulerBtn.addEventListener('click', openRuler);
+        exportSvgBtn.addEventListener('click', exportSVG);
+
+        // Tool selection
+        selectToolBtn.addEventListener('click', activateSelectTool);
+        textToolBtn.addEventListener('click', activateTextTool);
 
         // Shapes panel
         closeShapesBtn.addEventListener('click', closeShapesPanel);
@@ -194,6 +248,13 @@
         shapeFillCheckbox.addEventListener('change', function() {
             state.shapeFill = this.checked;
         });
+        shapeRoughCheckbox.addEventListener('change', function() {
+            state.shapeRough = this.checked;
+        });
+
+        // Text dialog
+        textConfirmBtn.addEventListener('click', addTextToCanvas);
+        textCancelBtn.addEventListener('click', cancelTextInput);
 
         // Ruler
         closeRulerBtn.addEventListener('click', closeRuler);
@@ -236,6 +297,112 @@
         state.isEraser = !state.isEraser;
         brushEraserToggle.textContent = state.isEraser ? 'Eraser' : 'Brush';
         brushEraserToggle.classList.toggle('active', state.isEraser);
+        state.currentTool = 'brush';
+        updateToolButtons();
+    }
+
+    // Tool activation
+    function activateSelectTool() {
+        state.currentTool = 'select';
+        updateToolButtons();
+        showToast('Select tool activated - click objects to select');
+    }
+
+    function activateTextTool() {
+        state.currentTool = 'text';
+        updateToolButtons();
+        showToast('Text tool activated - click to place text');
+    }
+
+    function updateToolButtons() {
+        // Clear all active states
+        brushEraserToggle.classList.remove('active');
+        selectToolBtn.classList.remove('active');
+        textToolBtn.classList.remove('active');
+        
+        // Set active state for current tool
+        if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
+            brushEraserToggle.classList.add('active');
+        } else if (state.currentTool === 'select') {
+            selectToolBtn.classList.add('active');
+        } else if (state.currentTool === 'text') {
+            textToolBtn.classList.add('active');
+        }
+    }
+
+    // Text tool functions
+    function addTextToCanvas() {
+        const text = textInput.value.trim();
+        if (!text) {
+            cancelTextInput();
+            return;
+        }
+
+        // Save history state
+        saveHistoryState();
+
+        // Draw text on canvas
+        ctx.font = '24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif';
+        ctx.fillStyle = state.currentColor;
+        ctx.textBaseline = 'top';
+        ctx.fillText(text, state.textX, state.textY);
+
+        // Store as object
+        state.objects.push({
+            type: 'text',
+            x: state.textX,
+            y: state.textY,
+            text: text,
+            color: state.currentColor,
+            font: '24px sans-serif'
+        });
+
+        cancelTextInput();
+        saveCanvasToStorage();
+    }
+
+    function cancelTextInput() {
+        textDialog.classList.add('hidden');
+        textInput.value = '';
+    }
+
+    // SVG Export
+    function exportSVG() {
+        try {
+            // Create SVG with canvas content
+            const rect = canvas.getBoundingClientRect();
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('width', rect.width);
+            svg.setAttribute('height', rect.height);
+            svg.setAttribute('xmlns', svgNS);
+
+            // Convert canvas to image and embed in SVG
+            const image = document.createElementNS(svgNS, 'image');
+            image.setAttribute('width', rect.width);
+            image.setAttribute('height', rect.height);
+            image.setAttribute('href', canvas.toDataURL('image/png'));
+            svg.appendChild(image);
+
+            // Serialize SVG to string
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svg);
+            const blob = new Blob([svgString], { type: 'image/svg+xml' });
+
+            // Download
+            const link = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            link.download = `lifepad-${timestamp}.svg`;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            URL.revokeObjectURL(link.href);
+
+            showToast('SVG exported successfully');
+            toolsMenu.classList.remove('show');
+        } catch (error) {
+            showToast('Failed to export SVG');
+            console.error('SVG export error:', error);
+        }
     }
 
     // Drawing functions
@@ -245,6 +412,22 @@
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+
+        // Handle text tool
+        if (state.currentTool === 'text') {
+            state.textX = x;
+            state.textY = y;
+            textDialog.classList.remove('hidden');
+            textInput.focus();
+            return;
+        }
+
+        // Handle select tool
+        if (state.currentTool === 'select') {
+            // For now, just show a message
+            showToast('Select tool - object selection coming soon');
+            return;
+        }
         
         if (state.currentShape) {
             // Drawing a shape
@@ -799,8 +982,102 @@
                     ctx.stroke();
                 }
                 break;
+
+            case 'diamond':
+                const diamondCenterX = x1 + width / 2;
+                const diamondCenterY = y1 + height / 2;
+                
+                ctx.moveTo(diamondCenterX, y1); // top
+                ctx.lineTo(x2, diamondCenterY); // right
+                ctx.lineTo(diamondCenterX, y2); // bottom
+                ctx.lineTo(x1, diamondCenterY); // left
+                ctx.closePath();
+                
+                if (state.shapeFill) {
+                    ctx.fill();
+                } else {
+                    ctx.stroke();
+                }
+                break;
+
+            case 'ellipse':
+                const ellipseRadiusX = Math.abs(width) / 2;
+                const ellipseRadiusY = Math.abs(height) / 2;
+                const ellipseCenterX = x1 + width / 2;
+                const ellipseCenterY = y1 + height / 2;
+                
+                ctx.ellipse(ellipseCenterX, ellipseCenterY, ellipseRadiusX, ellipseRadiusY, 0, 0, Math.PI * 2);
+                if (state.shapeFill) {
+                    ctx.fill();
+                } else {
+                    ctx.stroke();
+                }
+                break;
+        }
+
+        // Apply hand-drawn effect if enabled
+        if (state.shapeRough && !isPreview) {
+            applyHandDrawnEffect(x1, y1, x2, y2, shape);
         }
         
+        ctx.globalAlpha = 1;
+    }
+
+    // Apply hand-drawn/sketch effect to shapes
+    function applyHandDrawnEffect(x1, y1, x2, y2, shape) {
+        const originalLineWidth = ctx.lineWidth;
+        ctx.lineWidth = Math.max(1, originalLineWidth * 0.8);
+        ctx.globalAlpha = 0.3;
+        
+        const width = x2 - x1;
+        const height = y2 - y1;
+        const jitter = 2; // Amount of randomness
+        
+        ctx.beginPath();
+        
+        switch (shape) {
+            case 'rectangle':
+                // Draw slightly offset rectangles for hand-drawn effect
+                for (let i = 0; i < 2; i++) {
+                    const offsetX = (Math.random() - 0.5) * jitter;
+                    const offsetY = (Math.random() - 0.5) * jitter;
+                    ctx.strokeRect(x1 + offsetX, y1 + offsetY, width, height);
+                }
+                break;
+                
+            case 'circle':
+            case 'ellipse':
+                const radiusX = Math.abs(width) / 2;
+                const radiusY = Math.abs(height) / 2;
+                const centerX = x1 + width / 2;
+                const centerY = y1 + height / 2;
+                
+                // Draw slightly offset ellipses
+                for (let i = 0; i < 2; i++) {
+                    const offsetX = (Math.random() - 0.5) * jitter;
+                    const offsetY = (Math.random() - 0.5) * jitter;
+                    ctx.beginPath();
+                    ctx.ellipse(centerX + offsetX, centerY + offsetY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                break;
+                
+            case 'line':
+                // Draw slightly wavy lines
+                for (let i = 0; i < 2; i++) {
+                    const offsetX1 = (Math.random() - 0.5) * jitter;
+                    const offsetY1 = (Math.random() - 0.5) * jitter;
+                    const offsetX2 = (Math.random() - 0.5) * jitter;
+                    const offsetY2 = (Math.random() - 0.5) * jitter;
+                    ctx.beginPath();
+                    ctx.moveTo(x1 + offsetX1, y1 + offsetY1);
+                    ctx.lineTo(x2 + offsetX2, y2 + offsetY2);
+                    ctx.stroke();
+                }
+                break;
+        }
+        
+        ctx.lineWidth = originalLineWidth;
         ctx.globalAlpha = 1;
     }
 
