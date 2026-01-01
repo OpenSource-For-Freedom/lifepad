@@ -37,7 +37,7 @@
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler;
     // Collaboration elements
-    let collabBtn, collabModal, closeCollabModal, collabStatus, collabError;
+    let collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
     let hostPassphrase, createOfferBtn, offerBlob, offerOutput, copyOfferBtn;
     let answerBlobInput, answerInput, applyAnswerBtn;
@@ -201,8 +201,8 @@
         paperBgCheckbox.addEventListener('change', togglePaperMode);
         
         // Collaboration
-        // Note: collabBtn is not present in HTML, collaboration feature seems incomplete
-        // collabBtn.addEventListener('click', openCollabModal);
+        // TODO: Add collaboration trigger button to HTML - currently no UI element exists to open the modal
+        // The collaboration modal and its functionality are implemented but lack a trigger button
         closeCollabModal.addEventListener('click', closeCollabModalFn);
         hostTabBtn.addEventListener('click', () => switchTab('host'));
         joinTabBtn.addEventListener('click', () => switchTab('join'));
