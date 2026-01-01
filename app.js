@@ -478,6 +478,41 @@
         }
     }
 
+    // Pressure normalization constants
+    const PRESSURE_MIN = 0.1;      // Minimum pressure to avoid zero-width strokes
+    const PRESSURE_MAX = 1.5;      // Maximum pressure to avoid excessive width
+    const PRESSURE_SCALE = 2;      // Scale factor for stylus pressure sensitivity
+
+    // Normalize pressure value for all pointer types
+    function normalizePressure(e) {
+        // Pointer events provide pressure values between 0 and 1
+        // According to the spec:
+        // - For mice: pressure is 0 when no button is pressed, 0.5 when button is pressed
+        // - For pens/stylus: pressure ranges from 0 to 1 based on actual pressure applied
+        // - For touch: pressure may be 0, 0.5, or unavailable (undefined/null)
+        
+        if (e.pressure === undefined || e.pressure === null) {
+            // No pressure information available (older browsers or certain devices)
+            return 1;
+        }
+        
+        if (e.pressure === 0) {
+            // No button pressed (shouldn't happen during drawing, but handle it)
+            return 1;
+        }
+        
+        // For stylus/pen devices, apply pressure scaling for better sensitivity
+        // For mouse/touch, use the pressure value directly (typically 0.5 for mouse)
+        if (e.pointerType === 'pen') {
+            // Scale pen pressure for better feel (0-1 → 0.1-1.5 range)
+            return Math.max(PRESSURE_MIN, Math.min(PRESSURE_MAX, e.pressure * PRESSURE_SCALE));
+        }
+        
+        // For mouse and touch, return pressure value directly (no scaling)
+        // This gives a consistent baseline (0.5 for mouse, varies for touch)
+        return e.pressure;
+    }
+
     // Drawing functions
     function startDrawing(e) {
         e.preventDefault();
@@ -505,6 +540,7 @@
             activeShape: state.activeShape,
             pointerType: e.pointerType,
             pointerId: e.pointerId,
+            normalizedPressure: normalizePressure(e),
             x, y
         });
 
@@ -549,8 +585,8 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
-            // Create sync event
-            Sync.createStrokeBegin(x, y, e.pressure || 1);
+            // Create sync event with normalized pressure
+            Sync.createStrokeBegin(x, y, normalizePressure(e));
             return;
         }
     }
@@ -582,8 +618,8 @@
             return;
         }
         
-        // Get pressure if available
-        const pressure = e.pressure > 0 ? e.pressure : 1;
+        // Get normalized pressure for all input types
+        const pressure = normalizePressure(e);
         
         // Calculate size with pressure
         const size = state.currentSize * pressure;
