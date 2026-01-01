@@ -42,15 +42,13 @@
     let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler;
-    let selectToolBtn, textToolBtn;
-    let textDialog, textInput, textConfirmBtn, textCancelBtn;
-    let collabBtn, collabModal, collabStatus, closeCollabModal;
+    // Collaboration elements
+    let collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
-    let createOfferBtn, copyOfferBtn, offerBlob, offerOutput;
-    let answerBlobInput, applyAnswerBtn, answerInput;
-    let createAnswerBtn, copyAnswerBtn, answerBlob, answerOutput;
-    let hostPassphrase, joinPassphrase, offerBlobInput;
-    let disconnectBtn, collabError;
+    let hostPassphrase, createOfferBtn, offerBlob, offerOutput, copyOfferBtn;
+    let answerBlobInput, answerInput, applyAnswerBtn;
+    let joinPassphrase, offerBlobInput, createAnswerBtn, answerBlob, answerOutput, copyAnswerBtn;
+    let disconnectBtn;
 
     // Initialize app
     function init() {
@@ -90,30 +88,24 @@
         closeRulerBtn = document.getElementById('close-ruler');
         horizontalRuler = document.getElementById('horizontal-ruler');
         verticalRuler = document.getElementById('vertical-ruler');
-        selectToolBtn = document.getElementById('select-tool');
-        textToolBtn = document.getElementById('text-tool');
-        textDialog = document.getElementById('text-dialog');
-        textInput = document.getElementById('text-input');
-        textConfirmBtn = document.getElementById('text-confirm');
-        textCancelBtn = document.getElementById('text-cancel');
         
         // Collaboration elements
-        collabBtn = document.getElementById('collab-btn');
         collabModal = document.getElementById('collab-modal');
         collabStatus = document.getElementById('collab-status');
-        closeCollabModal = document.getElementById('close-collab-modal');
-        hostTabBtn = document.querySelector('[data-tab="host"]');
-        joinTabBtn = document.querySelector('[data-tab="join"]');
+        collabError = document.getElementById('collab-error');
         hostTab = document.getElementById('host-tab');
         joinTab = document.getElementById('join-tab');
         createOfferBtn = document.getElementById('create-offer-btn');
-        copyOfferBtn = document.getElementById('copy-offer-btn');
         offerBlob = document.getElementById('offer-blob');
         offerOutput = document.getElementById('offer-output');
+        copyOfferBtn = document.getElementById('copy-offer-btn');
         answerBlobInput = document.getElementById('answer-blob-input');
+        answerInput = document.getElementById('answer-input');
         applyAnswerBtn = document.getElementById('apply-answer-btn');
         answerInput = document.getElementById('answer-input');
         createAnswerBtn = document.getElementById('create-answer-btn');
+        answerBlob = document.getElementById('answer-blob');
+        answerOutput = document.getElementById('answer-output');
         copyAnswerBtn = document.getElementById('copy-answer-btn');
         answerBlob = document.getElementById('answer-blob');
         answerOutput = document.getElementById('answer-output');
@@ -121,7 +113,9 @@
         joinPassphrase = document.getElementById('join-passphrase');
         offerBlobInput = document.getElementById('offer-blob-input');
         disconnectBtn = document.getElementById('disconnect-btn');
-        collabError = document.getElementById('collab-error');
+        // Tab buttons don't have IDs, select by class and data attribute
+        hostTabBtn = document.querySelector('.tab-btn[data-tab="host"]');
+        joinTabBtn = document.querySelector('.tab-btn[data-tab="join"]');
 
         // Setup canvas
         setupCanvas();
@@ -216,17 +210,18 @@
         themeToggleBtn.addEventListener('click', toggleTheme);
         paperBgCheckbox.addEventListener('change', togglePaperMode);
         
-        // Collaboration (only if elements exist)
-        if (collabBtn) collabBtn.addEventListener('click', openCollabModal);
-        if (closeCollabModal) closeCollabModal.addEventListener('click', closeCollabModalFn);
-        if (hostTabBtn) hostTabBtn.addEventListener('click', () => switchTab('host'));
-        if (joinTabBtn) joinTabBtn.addEventListener('click', () => switchTab('join'));
-        if (createOfferBtn) createOfferBtn.addEventListener('click', handleCreateOffer);
-        if (copyOfferBtn) copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
-        if (applyAnswerBtn) applyAnswerBtn.addEventListener('click', handleApplyAnswer);
-        if (createAnswerBtn) createAnswerBtn.addEventListener('click', handleCreateAnswer);
-        if (copyAnswerBtn) copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
-        if (disconnectBtn) disconnectBtn.addEventListener('click', handleDisconnect);
+        // Collaboration
+        // TODO: Add collaboration trigger button to HTML - currently no UI element exists to open the modal
+        // The collaboration modal and its functionality are implemented but lack a trigger button
+        closeCollabModal.addEventListener('click', closeCollabModalFn);
+        hostTabBtn.addEventListener('click', () => switchTab('host'));
+        joinTabBtn.addEventListener('click', () => switchTab('join'));
+        createOfferBtn.addEventListener('click', handleCreateOffer);
+        copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
+        applyAnswerBtn.addEventListener('click', handleApplyAnswer);
+        createAnswerBtn.addEventListener('click', handleCreateAnswer);
+        copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
+        disconnectBtn.addEventListener('click', handleDisconnect);
 
         // Tools dropdown
         toolsBtn.addEventListener('click', toggleToolsMenu);
