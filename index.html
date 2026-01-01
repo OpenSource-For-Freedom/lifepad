@@ -7,10 +7,11 @@
     <meta name="theme-color" content="#2a2d3a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="lifePAD">
     <title>lifePAD</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -103,6 +104,7 @@
                     </div>
                 </div>
                 <button id="help-btn" class="tool-btn" title="Help">Help</button>
+                <button id="install-btn" class="tool-btn" title="Install app" style="display: none;">Install</button>
             </div>
 
             <div class="nav-section collab-status-section">
@@ -271,6 +273,27 @@
             <div class="modal-footer">
                 <button id="disconnect-btn" class="secondary-btn hidden">Disconnect</button>
                 <div id="collab-error" class="error-message hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS Install Help Modal -->
+    <div id="ios-install-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Install on iOS</h2>
+                <button id="close-ios-install" class="close-btn" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="info-box">
+                    <p><strong>To install lifePAD on your iOS device:</strong></p>
+                    <ol>
+                        <li>Tap the Share button at the bottom of Safari (square with arrow pointing up)</li>
+                        <li>Scroll down and tap "Add to Home Screen"</li>
+                        <li>Tap "Add" in the top right corner</li>
+                        <li>lifePAD will appear on your home screen like a native app</li>
+                    </ol>
+                </div>
             </div>
         </div>
     </div>
