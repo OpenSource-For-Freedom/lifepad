@@ -2017,12 +2017,12 @@
             
             await RTC.applyAnswer(answerBlobObj);
             
-            applyAnswerBtn.textContent = 'Connected!';
-            showToast('Connection established - start drawing!');
+            applyAnswerBtn.textContent = 'Applied';
+            // Toast notification will be shown after handshake completes
             
             // Reset button text after delay
             setTimeout(() => {
-                if (applyAnswerBtn.textContent === 'Connected!') {
+                if (applyAnswerBtn.textContent === 'Applied') {
                     applyAnswerBtn.textContent = 'Connect';
                 }
             }, BUTTON_RESET_DELAY);
