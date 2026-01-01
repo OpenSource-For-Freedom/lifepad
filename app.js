@@ -2522,7 +2522,11 @@
             
             // Mark handshake complete
             this.handshakeComplete = true;
-            updateCollabStatus('Encrypted session active');
+            updateCollabStatus('Connected with peer');
+            
+            // Close the collaboration modal on successful connection
+            closeCollabModalFn();
+            showToast('Connection established! You are now collaborating.');
             
             // If host, send snapshot
             if (this.isHost) {
@@ -2533,7 +2537,11 @@
         // Handle hello ack
         async handleHelloAck(message) {
             this.handshakeComplete = true;
-            updateCollabStatus('Encrypted session active');
+            updateCollabStatus('Connected with peer');
+            
+            // Close the collaboration modal on successful connection
+            closeCollabModalFn();
+            showToast('Connection established! You are now collaborating.');
         },
         
         // Send encrypted message
