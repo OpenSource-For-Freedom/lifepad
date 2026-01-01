@@ -924,13 +924,11 @@
     function restoreHistoryState(dataUrl) {
         const img = new Image();
         img.onload = function() {
-            // Clear canvas
+            // Clear canvas and draw image without transform
+            // History images should be drawn pixel-for-pixel
             resetTransform(ctx);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw image with zoom transformation
-            applyTransform(ctx);
             ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
-            resetTransform(ctx);
         };
         img.src = dataUrl;
     }
