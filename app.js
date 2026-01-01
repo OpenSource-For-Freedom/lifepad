@@ -818,7 +818,7 @@
 
     function openSampleCanvas() {
         // Draw a sample stroke
-        ctx.strokeStyle = '#6b6b6b';
+        ctx.strokeStyle = '#5a8dee';
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
         ctx.globalAlpha = 1;
@@ -832,7 +832,7 @@
         ctx.stroke();
         
         ctx.font = '24px sans-serif';
-        ctx.fillStyle = '#555555';
+        ctx.fillStyle = '#666666';
         ctx.textAlign = 'center';
         ctx.fillText('Welcome to lifePAD', centerX, centerY + 100);
         
