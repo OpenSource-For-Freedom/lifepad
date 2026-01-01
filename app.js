@@ -165,6 +165,9 @@
         // Setup canvas
         setupCanvas();
         
+        // Initialize zoom
+        applyCanvasZoom();
+        
         // Load saved state
         loadState();
         
@@ -543,23 +546,34 @@
     
     // Coordinate transformation helpers for zoom and pan
     function screenToCanvas(screenX, screenY) {
-        // Convert screen coordinates to canvas coordinates accounting for zoom and pan
+        // Convert screen coordinates to canvas coordinates accounting for CSS zoom
+        // The canvas element is scaled via CSS transform, so we need to account for that
         return {
-            x: (screenX - state.panX) / state.scale,
-            y: (screenY - state.panY) / state.scale
+            x: screenX / state.scale,
+            y: screenY / state.scale
         };
     }
     
     function applyTransform(context) {
-        // Apply zoom and pan transformation to context
+        // No zoom transform applied - drawings are always at 1:1 scale
+        // Zoom is handled via CSS transform on the canvas element
         const dpr = window.devicePixelRatio || 1;
-        context.setTransform(dpr * state.scale, 0, 0, dpr * state.scale, dpr * state.panX, dpr * state.panY);
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     
     function resetTransform(context) {
         // Reset to default transform (DPR only)
         const dpr = window.devicePixelRatio || 1;
         context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    
+    function applyCanvasZoom() {
+        // Apply CSS transform to visually scale the canvas
+        const transform = `scale(${state.scale})`;
+        canvas.style.transform = transform;
+        canvas.style.transformOrigin = '0 0';
+        overlayCanvas.style.transform = transform;
+        overlayCanvas.style.transformOrigin = '0 0';
     }
 
     // Drawing functions
@@ -924,13 +938,11 @@
     function restoreHistoryState(dataUrl) {
         const img = new Image();
         img.onload = function() {
-            // Clear canvas
+            // Clear canvas and draw image at 1:1 scale
+            // Zoom is handled by CSS transform, not canvas context transform
             resetTransform(ctx);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Draw image with zoom transformation
-            applyTransform(ctx);
             ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
-            resetTransform(ctx);
         };
         img.src = dataUrl;
     }
@@ -1001,39 +1013,24 @@
     
     // Zoom and pan functions
     function zoomIn() {
-        const rect = canvas.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        zoom(1.2, centerX, centerY);
+        zoom(1.2);
     }
     
     function zoomOut() {
-        const rect = canvas.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        zoom(1 / 1.2, centerX, centerY);
+        zoom(1 / 1.2);
     }
     
     function resetZoom() {
         state.scale = 1;
-        state.panX = 0;
-        state.panY = 0;
         updateZoomDisplay();
-        redrawCanvas();
+        applyCanvasZoom();
         showToast('Zoom reset to 100%');
     }
     
-    function zoom(factor, centerX, centerY) {
-        const oldScale = state.scale;
+    function zoom(factor) {
         state.scale = Math.max(state.minScale, Math.min(state.maxScale, state.scale * factor));
-        
-        // Adjust pan to zoom towards the center point
-        const scaleChange = state.scale / oldScale;
-        state.panX = centerX - (centerX - state.panX) * scaleChange;
-        state.panY = centerY - (centerY - state.panY) * scaleChange;
-        
         updateZoomDisplay();
-        redrawCanvas();
+        applyCanvasZoom();
     }
     
     function updateZoomDisplay() {
@@ -1049,12 +1046,7 @@
         const delta = e.deltaY;
         const zoomFactor = delta > 0 ? 1 / 1.1 : 1.1;
         
-        // Get mouse position relative to canvas
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        zoom(zoomFactor, x, y);
+        zoom(zoomFactor);
     }
     
     function handleKeyboard(e) {
@@ -1073,18 +1065,12 @@
             e.preventDefault();
             resetZoom();
         }
-        // Pan with space + arrow keys
-        else if (e.key === ' ' && e.shiftKey) {
-            e.preventDefault();
-            state.isPanning = true;
-        }
     }
     
     function redrawCanvas() {
-        // This will trigger on the next animation frame
+        // Apply CSS zoom transform and redraw from history
+        applyCanvasZoom();
         requestAnimationFrame(() => {
-            // The transform is applied in the drawing context
-            // We need to redraw from history
             if (state.history.length > 0 && state.historyStep >= 0) {
                 restoreHistoryState(state.history[state.historyStep]);
             }
