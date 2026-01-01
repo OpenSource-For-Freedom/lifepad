@@ -2510,6 +2510,14 @@
             }
         },
         
+        // Complete handshake and notify user
+        completeHandshake() {
+            this.handshakeComplete = true;
+            updateCollabStatus('Connected with peer');
+            closeCollabModalFn();
+            showToast('Connection established! You are now collaborating.');
+        },
+        
         // Handle hello handshake
         async handleHello(message) {
             // Send ack back
@@ -2520,13 +2528,8 @@
             
             await this.sendEncrypted(ack);
             
-            // Mark handshake complete
-            this.handshakeComplete = true;
-            updateCollabStatus('Connected with peer');
-            
-            // Close the collaboration modal on successful connection
-            closeCollabModalFn();
-            showToast('Connection established! You are now collaborating.');
+            // Complete handshake
+            this.completeHandshake();
             
             // If host, send snapshot
             if (this.isHost) {
@@ -2536,12 +2539,8 @@
         
         // Handle hello ack
         async handleHelloAck(message) {
-            this.handshakeComplete = true;
-            updateCollabStatus('Connected with peer');
-            
-            // Close the collaboration modal on successful connection
-            closeCollabModalFn();
-            showToast('Connection established! You are now collaborating.');
+            // Complete handshake
+            this.completeHandshake();
         },
         
         // Send encrypted message
