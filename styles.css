@@ -718,6 +718,54 @@ html, body {
     transform: translateX(-50%) translateY(-2px);
 }
 
+/* Ruler measurement marks */
+.ruler-mark {
+    position: absolute;
+    background: white;
+}
+
+.horizontal-ruler .ruler-mark {
+    width: 2px;
+    top: 0;
+}
+
+.horizontal-ruler .ruler-mark.major {
+    height: 30px;
+}
+
+.horizontal-ruler .ruler-mark.minor {
+    height: 20px;
+}
+
+.vertical-ruler .ruler-mark {
+    height: 2px;
+    left: 0;
+}
+
+.vertical-ruler .ruler-mark.major {
+    width: 30px;
+}
+
+.vertical-ruler .ruler-mark.minor {
+    width: 20px;
+}
+
+.ruler-label {
+    position: absolute;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.horizontal-ruler .ruler-label {
+    top: 5px;
+}
+
+.vertical-ruler .ruler-label {
+    left: 5px;
+    writing-mode: vertical-rl;
+}
+
 /* Mobile adjustments for new features */
 @media (max-width: 768px) {
     .shapes-panel {

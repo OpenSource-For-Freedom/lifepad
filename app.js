@@ -804,26 +804,14 @@
         
         for (let i = 0; i <= hWidth; i += hInterval) {
             const mark = document.createElement('div');
-            mark.style.cssText = `
-                position: absolute;
-                left: ${i}px;
-                top: 0;
-                width: 2px;
-                height: ${i % 100 === 0 ? '30px' : '20px'};
-                background: white;
-            `;
+            mark.className = i % 100 === 0 ? 'ruler-mark major' : 'ruler-mark minor';
+            mark.style.left = i + 'px';
             
             if (i % 100 === 0) {
                 const label = document.createElement('span');
+                label.className = 'ruler-label';
                 label.textContent = i;
-                label.style.cssText = `
-                    position: absolute;
-                    left: ${i + 5}px;
-                    top: 5px;
-                    color: white;
-                    font-size: 11px;
-                    font-weight: bold;
-                `;
+                label.style.left = (i + 5) + 'px';
                 hMeasurements.appendChild(label);
             }
             
@@ -839,27 +827,14 @@
         
         for (let i = 0; i <= vHeight; i += vInterval) {
             const mark = document.createElement('div');
-            mark.style.cssText = `
-                position: absolute;
-                top: ${i}px;
-                left: 0;
-                height: 2px;
-                width: ${i % 100 === 0 ? '30px' : '20px'};
-                background: white;
-            `;
+            mark.className = i % 100 === 0 ? 'ruler-mark major' : 'ruler-mark minor';
+            mark.style.top = i + 'px';
             
             if (i % 100 === 0) {
                 const label = document.createElement('span');
+                label.className = 'ruler-label';
                 label.textContent = i;
-                label.style.cssText = `
-                    position: absolute;
-                    top: ${i + 5}px;
-                    left: 5px;
-                    color: white;
-                    font-size: 11px;
-                    font-weight: bold;
-                    writing-mode: vertical-rl;
-                `;
+                label.style.top = (i + 5) + 'px';
                 vMeasurements.appendChild(label);
             }
             
