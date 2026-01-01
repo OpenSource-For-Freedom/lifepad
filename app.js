@@ -478,6 +478,28 @@
         }
     }
 
+    // Normalize pressure value for all pointer types
+    function normalizePressure(e) {
+        // Pointer events provide pressure values between 0 and 1
+        // For mice: pressure is typically 0 (no button) or 0.5 (button pressed)
+        // For pens/stylus: pressure ranges from 0 to 1 based on actual pressure
+        // For touch: pressure may be 0, 0.5, or unavailable (undefined/null)
+        
+        if (e.pressure === undefined || e.pressure === null) {
+            // No pressure information available (older browsers or certain devices)
+            return 1;
+        }
+        
+        if (e.pressure === 0) {
+            // Mouse/touch without pressure support - use default pressure
+            return 1;
+        }
+        
+        // For devices with pressure support, use the actual pressure value
+        // Clamp to range [0.1, 1.5] to avoid zero-width strokes and excessive width
+        return Math.max(0.1, Math.min(1.5, e.pressure * 2));
+    }
+
     // Drawing functions
     function startDrawing(e) {
         e.preventDefault();
@@ -505,6 +527,8 @@
             activeShape: state.activeShape,
             pointerType: e.pointerType,
             pointerId: e.pointerId,
+            pressure: e.pressure,
+            normalizedPressure: normalizePressure(e),
             x, y
         });
 
@@ -549,8 +573,8 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
-            // Create sync event
-            Sync.createStrokeBegin(x, y, e.pressure || 1);
+            // Create sync event with normalized pressure
+            Sync.createStrokeBegin(x, y, normalizePressure(e));
             return;
         }
     }
@@ -582,8 +606,8 @@
             return;
         }
         
-        // Get pressure if available
-        const pressure = e.pressure > 0 ? e.pressure : 1;
+        // Get normalized pressure for all input types
+        const pressure = normalizePressure(e);
         
         // Calculate size with pressure
         const size = state.currentSize * pressure;
