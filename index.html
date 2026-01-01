@@ -149,6 +149,14 @@
                         <div class="ruler-measurements"></div>
                     </div>
                 </div>
+                <div class="ruler-controls">
+                    <div class="ruler-control-group">
+                        <label for="ruler-scale">Scale (pixels per meter):</label>
+                        <input type="range" id="ruler-scale" min="50" max="200" value="100" step="10">
+                        <span id="ruler-scale-value">100</span>
+                    </div>
+                    <button id="ruler-reset" class="secondary-btn">Reset Position</button>
+                </div>
                 <button id="close-ruler" class="close-ruler-btn">Close Ruler</button>
             </div>
         </div>
