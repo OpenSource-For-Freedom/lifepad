@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="description" content="lifePAD - Primary Artistry Device. A simple sketch pad for touch and stylus.">
+    <meta name="description" content="lifePAD - Primary Artistry Device. An Excalidraw alternative with hand-drawn diagrams, shapes, text, and artistic brushes. Privacy-first PWA.">
     <meta name="theme-color" content="#2a2d3a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -25,12 +25,12 @@
             <div class="intro-sections">
                 <section>
                     <h2>What it is</h2>
-                    <p>A simple sketch pad that works with touch and stylus input on any device.</p>
+                    <p>A sketch pad and diagramming tool with hand-drawn aesthetics, shapes, text, and artistic brushes. An Excalidraw alternative that works with touch and stylus on any device.</p>
                 </section>
                 
                 <section>
                     <h2>What you can do</h2>
-                    <p>Draw with different colors and textures, erase mistakes, undo and redo your strokes, and save your artwork as PNG images.</p>
+                    <p>Create diagrams and drawings with hand-drawn style shapes, add text labels, use different brush textures, and export as PNG or SVG. Real-time collaboration included.</p>
                 </section>
                 
                 <section>
@@ -87,7 +87,9 @@
             </div>
 
             <div class="nav-section actions-section">
-                <button id="brush-eraser-toggle" class="tool-btn" title="Toggle Brush/Eraser">Brush</button>
+                <button id="select-tool" class="tool-btn" title="Select and move objects">Select</button>
+                <button id="text-tool" class="tool-btn" title="Add text">Text</button>
+                <button id="brush-eraser-toggle" class="tool-btn active" title="Toggle Brush/Eraser">Brush</button>
                 <button id="undo-btn" class="tool-btn" title="Undo">Undo</button>
                 <button id="redo-btn" class="tool-btn" title="Redo">Redo</button>
                 <button id="clear-btn" class="tool-btn" title="Clear canvas">Clear</button>
@@ -97,12 +99,14 @@
                     <div id="tools-menu" class="dropdown-menu">
                         <button id="shapes-btn" class="dropdown-item">Shapes</button>
                         <button id="ruler-btn" class="dropdown-item">Ruler</button>
+                        <button id="export-svg-btn" class="dropdown-item">Export SVG</button>
                     </div>
                 </div>
                 <button id="help-btn" class="tool-btn" title="Help">Help</button>
             </div>
 
             <div class="nav-section collab-status-section">
+                <button id="collab-btn" class="tool-btn" title="Collaboration">Collab</button>
                 <span id="collab-status" class="collab-status">Disconnected</span>
             </div>
 
@@ -131,11 +135,17 @@
                     <button class="shape-btn" data-shape="triangle" title="Triangle">△</button>
                     <button class="shape-btn" data-shape="arrow" title="Arrow">→</button>
                     <button class="shape-btn" data-shape="star" title="Star">★</button>
+                    <button class="shape-btn" data-shape="diamond" title="Diamond">◇</button>
+                    <button class="shape-btn" data-shape="ellipse" title="Ellipse">⬭</button>
                 </div>
                 <div class="shape-controls">
                     <label>
                         <input type="checkbox" id="shape-fill" />
                         <span>Fill shape</span>
+                    </label>
+                    <label>
+                        <input type="checkbox" id="shape-rough" />
+                        <span>Hand-drawn style</span>
                     </label>
                 </div>
             </div>
@@ -158,6 +168,17 @@
                     <button id="ruler-reset" class="secondary-btn">Reset Position</button>
                 </div>
                 <button id="close-ruler" class="close-ruler-btn">Close Ruler</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Input Dialog -->
+    <div id="text-dialog" class="text-dialog hidden">
+        <div class="text-dialog-content">
+            <textarea id="text-input" placeholder="Enter text..." rows="4"></textarea>
+            <div class="text-dialog-actions">
+                <button id="text-confirm" class="primary-btn">Add Text</button>
+                <button id="text-cancel" class="secondary-btn">Cancel</button>
             </div>
         </div>
     </div>
