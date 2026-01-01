@@ -1,7 +1,7 @@
 // Service Worker for lifePAD
 // Provides offline functionality and caching
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `lifepad-cache-${CACHE_VERSION}`;
 
 // Files to cache for offline use
@@ -11,10 +11,7 @@ const STATIC_ASSETS = [
     './styles.css',
     './app.js',
     './manifest.webmanifest',
-    './favicon.png',
-    './icons/icon-192.png',
-    './icons/icon-512.png',
-    './icons/apple-touch-icon.png'
+    './icons/lifepad.PNG'
 ];
 
 // Install event - cache static assets

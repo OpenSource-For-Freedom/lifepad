@@ -1,26 +1,26 @@
 /* CSS Variables for theming */
 :root {
-    --bg-primary: #f5f5f5;
-    --bg-secondary: #ffffff;
-    --text-primary: #333333;
-    --text-secondary: #666666;
-    --border-color: #e0e0e0;
+    --bg-primary: #e8e8e8;
+    --bg-secondary: #f5f5f5;
+    --text-primary: #2c2c2c;
+    --text-secondary: #555555;
+    --border-color: #cccccc;
     --shadow: rgba(0, 0, 0, 0.1);
-    --accent: #5a8dee;
-    --accent-hover: #4a7dde;
+    --accent: #6b6b6b;
+    --accent-hover: #555555;
     --canvas-bg: #ffffff;
     --paper-bg: #fdf6e3;
 }
 
 [data-theme="dark"] {
-    --bg-primary: #2a2d3a;
-    --bg-secondary: #363a4f;
-    --text-primary: #e0e0e0;
-    --text-secondary: #a0a0a0;
-    --border-color: #4a4d5a;
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2c2c2c;
+    --text-primary: #cccccc;
+    --text-secondary: #888888;
+    --border-color: #3a3a3a;
     --shadow: rgba(0, 0, 0, 0.3);
-    --accent: #6a9eef;
-    --accent-hover: #7aaeef;
+    --accent: #6b6b6b;
+    --accent-hover: #888888;
     --canvas-bg: #ffffff;
     --paper-bg: #fdf6e3;
 }
@@ -100,26 +100,21 @@ html, body {
     margin-bottom: 24px;
     padding-bottom: 16px;
     border-bottom: 2px solid var(--border-color);
-    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: gradientShift 4s ease infinite;
 }
 
-@keyframes gradientShift {
-    0%, 100% {
-        filter: hue-rotate(0deg);
-    }
-    50% {
-        filter: hue-rotate(10deg);
-    }
+.intro-logo {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 16px;
+    display: block;
+    border-radius: 12px;
 }
 
 .intro-header h1 {
     font-size: 32px;
     font-weight: 700;
     margin-bottom: 8px;
+    color: var(--text-primary);
 }
 
 .intro-header .subtitle {
@@ -495,49 +490,49 @@ html, body {
 }
 
 .collab-status.disconnected {
-    background: #f5f5f5;
-    color: #666666;
+    background: #e8e8e8;
+    color: #555555;
 }
 
 .collab-status.connecting,
 .collab-status.creating-offer,
 .collab-status.waiting-for-answer,
 .collab-status.ready-to-join {
-    background: #fff4e6;
-    color: #e67e22;
+    background: #cccccc;
+    color: #3a3a3a;
 }
 
 .collab-status.connected {
-    background: #e8f5e9;
-    color: #2e7d32;
+    background: #888888;
+    color: #1a1a1a;
 }
 
 .collab-status.encrypted {
-    background: #e3f2fd;
-    color: #1565c0;
+    background: #6b6b6b;
+    color: #f5f5f5;
 }
 
 [data-theme="dark"] .collab-status.disconnected {
-    background: #363a4f;
-    color: #a0a0a0;
+    background: #2c2c2c;
+    color: #888888;
 }
 
 [data-theme="dark"] .collab-status.connecting,
 [data-theme="dark"] .collab-status.creating-offer,
 [data-theme="dark"] .collab-status.waiting-for-answer,
 [data-theme="dark"] .collab-status.ready-to-join {
-    background: #4a3f2f;
-    color: #f39c12;
+    background: #3a3a3a;
+    color: #cccccc;
 }
 
 [data-theme="dark"] .collab-status.connected {
-    background: #2d3f2d;
-    color: #66bb6a;
+    background: #555555;
+    color: #e8e8e8;
 }
 
 [data-theme="dark"] .collab-status.encrypted {
-    background: #2d3640;
-    color: #64b5f6;
+    background: #6b6b6b;
+    color: #f5f5f5;
 }
 
 /* Modal Overlay */
@@ -758,8 +753,8 @@ html, body {
 
 .error-message {
     padding: 12px 16px;
-    background: #ffebee;
-    color: #c62828;
+    background: #cccccc;
+    color: #2c2c2c;
     border-radius: 6px;
     font-size: 13px;
     font-weight: 500;
@@ -771,8 +766,8 @@ html, body {
 }
 
 [data-theme="dark"] .error-message {
-    background: #4a2d2d;
-    color: #ef5350;
+    background: #3a3a3a;
+    color: #cccccc;
 }
 
 /* High contrast improvements for accessibility */
