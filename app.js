@@ -478,6 +478,11 @@
         }
     }
 
+    // Pressure normalization constants
+    const PRESSURE_MIN = 0.1;      // Minimum pressure to avoid zero-width strokes
+    const PRESSURE_MAX = 1.5;      // Maximum pressure to avoid excessive width
+    const PRESSURE_SCALE = 2;      // Scale factor for stylus pressure sensitivity
+
     // Normalize pressure value for all pointer types
     function normalizePressure(e) {
         // Pointer events provide pressure values between 0 and 1
@@ -496,8 +501,8 @@
         }
         
         // For devices with pressure support, use the actual pressure value
-        // Clamp to range [0.1, 1.5] to avoid zero-width strokes and excessive width
-        return Math.max(0.1, Math.min(1.5, e.pressure * 2));
+        // Clamp to range [PRESSURE_MIN, PRESSURE_MAX] to avoid extreme values
+        return Math.max(PRESSURE_MIN, Math.min(PRESSURE_MAX, e.pressure * PRESSURE_SCALE));
     }
 
     // Drawing functions
@@ -527,7 +532,6 @@
             activeShape: state.activeShape,
             pointerType: e.pointerType,
             pointerId: e.pointerId,
-            pressure: e.pressure,
             normalizedPressure: normalizePressure(e),
             x, y
         });
