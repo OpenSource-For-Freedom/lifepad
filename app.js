@@ -28,6 +28,15 @@
     let undoBtn, redoBtn, clearBtn, saveBtn, helpBtn;
     let themeToggleBtn, paperBgCheckbox;
     let toast;
+    
+    // Collaboration elements
+    let collabBtn, collabStatus, collabModal, closeCollabModal;
+    let hostTab, joinTab, hostTabBtn, joinTabBtn;
+    let hostPassphrase, joinPassphrase;
+    let createOfferBtn, offerBlob, copyOfferBtn, offerOutput;
+    let answerBlobInput, applyAnswerBtn, answerInput;
+    let offerBlobInput, createAnswerBtn, answerBlob, copyAnswerBtn, answerOutput;
+    let disconnectBtn, collabError;
 
     // Initialize app
     function init() {
@@ -53,6 +62,32 @@
         paperBgCheckbox = document.getElementById('paper-bg');
         toast = document.getElementById('toast');
         colorSwatches = document.querySelectorAll('.color-swatch');
+        
+        // Collaboration elements
+        collabBtn = document.getElementById('collab-btn');
+        collabStatus = document.getElementById('collab-status');
+        collabModal = document.getElementById('collab-modal');
+        closeCollabModal = document.getElementById('close-collab-modal');
+        hostTab = document.getElementById('host-tab');
+        joinTab = document.getElementById('join-tab');
+        hostTabBtn = document.querySelector('[data-tab="host"]');
+        joinTabBtn = document.querySelector('[data-tab="join"]');
+        hostPassphrase = document.getElementById('host-passphrase');
+        joinPassphrase = document.getElementById('join-passphrase');
+        createOfferBtn = document.getElementById('create-offer-btn');
+        offerBlob = document.getElementById('offer-blob');
+        copyOfferBtn = document.getElementById('copy-offer-btn');
+        offerOutput = document.getElementById('offer-output');
+        answerBlobInput = document.getElementById('answer-blob-input');
+        applyAnswerBtn = document.getElementById('apply-answer-btn');
+        answerInput = document.getElementById('answer-input');
+        offerBlobInput = document.getElementById('offer-blob-input');
+        createAnswerBtn = document.getElementById('create-answer-btn');
+        answerBlob = document.getElementById('answer-blob');
+        copyAnswerBtn = document.getElementById('copy-answer-btn');
+        answerOutput = document.getElementById('answer-output');
+        disconnectBtn = document.getElementById('disconnect-btn');
+        collabError = document.getElementById('collab-error');
 
         // Setup canvas
         setupCanvas();
@@ -146,6 +181,18 @@
         // Settings
         themeToggleBtn.addEventListener('click', toggleTheme);
         paperBgCheckbox.addEventListener('change', togglePaperMode);
+        
+        // Collaboration
+        collabBtn.addEventListener('click', openCollabModal);
+        closeCollabModal.addEventListener('click', closeCollabModalFn);
+        hostTabBtn.addEventListener('click', () => switchTab('host'));
+        joinTabBtn.addEventListener('click', () => switchTab('join'));
+        createOfferBtn.addEventListener('click', handleCreateOffer);
+        copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
+        applyAnswerBtn.addEventListener('click', handleApplyAnswer);
+        createAnswerBtn.addEventListener('click', handleCreateAnswer);
+        copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
+        disconnectBtn.addEventListener('click', handleDisconnect);
 
         // Drawing events - using Pointer Events for universal support
         canvas.addEventListener('pointerdown', startDrawing);
@@ -195,6 +242,10 @@
         // Start path
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        
+        // Create sync event
+        const pressure = e.pressure > 0 ? e.pressure : 1;
+        Sync.createStrokeBegin(state.lastX, state.lastY, pressure);
     }
 
     function draw(e) {
@@ -234,6 +285,9 @@
             }
         }
         
+        // Create sync event
+        Sync.createStrokePoint(x, y, pressure);
+        
         state.lastX = x;
         state.lastY = y;
     }
@@ -242,6 +296,9 @@
         if (!state.isDrawing) return;
         e.preventDefault();
         state.isDrawing = false;
+        
+        // Create sync event
+        Sync.createStrokeEnd();
         
         // Autosave after stroke
         saveCanvasToStorage();
@@ -397,6 +454,10 @@
         if (confirm('Clear the entire canvas? This cannot be undone.')) {
             saveHistoryState();
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Create sync event
+            Sync.createClearEvent();
+            
             saveCanvasToStorage();
         }
     }
@@ -574,4 +635,910 @@
     } else {
         init();
     }
+
+    // ============================================
+    // COLLABORATION UI HANDLERS
+    // ============================================
+    
+    function openCollabModal() {
+        collabModal.classList.remove('hidden');
+    }
+    
+    function closeCollabModalFn() {
+        collabModal.classList.add('hidden');
+    }
+    
+    function switchTab(tab) {
+        if (tab === 'host') {
+            hostTabBtn.classList.add('active');
+            joinTabBtn.classList.remove('active');
+            hostTab.classList.add('active');
+            joinTab.classList.remove('active');
+        } else {
+            joinTabBtn.classList.add('active');
+            hostTabBtn.classList.remove('active');
+            joinTab.classList.add('active');
+            hostTab.classList.remove('active');
+        }
+    }
+    
+    async function handleCreateOffer() {
+        try {
+            const passphrase = hostPassphrase.value.trim();
+            
+            if (!passphrase) {
+                showCollabError('Please enter a passphrase');
+                return;
+            }
+            
+            if (passphrase.length < 8) {
+                showCollabError('Passphrase must be at least 8 characters');
+                return;
+            }
+            
+            clearCollabError();
+            createOfferBtn.disabled = true;
+            createOfferBtn.textContent = 'Creating offer...';
+            updateCollabStatus('Creating offer');
+            
+            const offerBlobObj = await RTC.createOffer(passphrase);
+            
+            offerBlob.value = JSON.stringify(offerBlobObj, null, 2);
+            offerOutput.classList.remove('hidden');
+            answerInput.classList.remove('hidden');
+            disconnectBtn.classList.remove('hidden');
+            
+            updateCollabStatus('Waiting for answer');
+            createOfferBtn.textContent = 'Offer Created';
+            
+        } catch (error) {
+            console.error('Create offer error:', error);
+            showCollabError('Failed to create offer: ' + error.message);
+            createOfferBtn.disabled = false;
+            createOfferBtn.textContent = 'Create Offer';
+            updateCollabStatus('Disconnected');
+        }
+    }
+    
+    async function handleApplyAnswer() {
+        try {
+            const answerText = answerBlobInput.value.trim();
+            
+            if (!answerText) {
+                showCollabError('Please paste the answer blob');
+                return;
+            }
+            
+            let answerBlobObj;
+            try {
+                answerBlobObj = JSON.parse(answerText);
+            } catch (e) {
+                showCollabError('Invalid answer blob format');
+                return;
+            }
+            
+            if (answerBlobObj.app !== 'lifePAD' || answerBlobObj.v !== 1 || answerBlobObj.type !== 'answer') {
+                showCollabError('Invalid answer blob - wrong app or version');
+                return;
+            }
+            
+            clearCollabError();
+            applyAnswerBtn.disabled = true;
+            applyAnswerBtn.textContent = 'Applying...';
+            updateCollabStatus('Connecting');
+            
+            await RTC.applyAnswer(answerBlobObj);
+            
+            applyAnswerBtn.textContent = 'Answer Applied';
+            showToast('Waiting for connection to establish');
+            
+        } catch (error) {
+            console.error('Apply answer error:', error);
+            showCollabError('Failed to apply answer: ' + error.message);
+            applyAnswerBtn.disabled = false;
+            applyAnswerBtn.textContent = 'Apply Answer';
+        }
+    }
+    
+    async function handleCreateAnswer() {
+        try {
+            const passphrase = joinPassphrase.value.trim();
+            const offerText = offerBlobInput.value.trim();
+            
+            if (!passphrase) {
+                showCollabError('Please enter the passphrase');
+                return;
+            }
+            
+            if (passphrase.length < 8) {
+                showCollabError('Passphrase must be at least 8 characters');
+                return;
+            }
+            
+            if (!offerText) {
+                showCollabError('Please paste the offer blob');
+                return;
+            }
+            
+            let offerBlobObj;
+            try {
+                offerBlobObj = JSON.parse(offerText);
+            } catch (e) {
+                showCollabError('Invalid offer blob format');
+                return;
+            }
+            
+            if (offerBlobObj.app !== 'lifePAD' || offerBlobObj.v !== 1 || offerBlobObj.type !== 'offer') {
+                showCollabError('Invalid offer blob - wrong app or version');
+                return;
+            }
+            
+            clearCollabError();
+            createAnswerBtn.disabled = true;
+            createAnswerBtn.textContent = 'Creating answer...';
+            updateCollabStatus('Ready to join');
+            
+            const answerBlobObj = await RTC.createAnswer(passphrase, offerBlobObj);
+            
+            answerBlob.value = JSON.stringify(answerBlobObj, null, 2);
+            answerOutput.classList.remove('hidden');
+            disconnectBtn.classList.remove('hidden');
+            
+            updateCollabStatus('Connecting');
+            createAnswerBtn.textContent = 'Answer Created';
+            showToast('Send answer blob to host to complete connection');
+            
+        } catch (error) {
+            console.error('Create answer error:', error);
+            showCollabError('Failed to create answer: ' + error.message);
+            createAnswerBtn.disabled = false;
+            createAnswerBtn.textContent = 'Create Answer';
+            updateCollabStatus('Disconnected');
+        }
+    }
+    
+    function handleDisconnect() {
+        RTC.disconnect();
+        
+        // Reset UI
+        hostPassphrase.value = '';
+        joinPassphrase.value = '';
+        offerBlob.value = '';
+        answerBlobInput.value = '';
+        offerBlobInput.value = '';
+        answerBlob.value = '';
+        
+        offerOutput.classList.add('hidden');
+        answerInput.classList.add('hidden');
+        answerOutput.classList.add('hidden');
+        disconnectBtn.classList.add('hidden');
+        
+        createOfferBtn.disabled = false;
+        createOfferBtn.textContent = 'Create Offer';
+        applyAnswerBtn.disabled = false;
+        applyAnswerBtn.textContent = 'Apply Answer';
+        createAnswerBtn.disabled = false;
+        createAnswerBtn.textContent = 'Create Answer';
+        
+        clearCollabError();
+        showToast('Disconnected from collaboration session');
+    }
+    
+    function updateCollabStatus(status) {
+        collabStatus.textContent = status;
+        
+        // Update CSS class for styling
+        collabStatus.className = 'collab-status';
+        
+        const statusLower = status.toLowerCase().replace(/\s+/g, '-');
+        collabStatus.classList.add(statusLower);
+    }
+    
+    function showCollabError(message) {
+        collabError.textContent = message;
+        collabError.classList.remove('hidden');
+    }
+    
+    function clearCollabError() {
+        collabError.textContent = '';
+        collabError.classList.add('hidden');
+    }
+    
+    async function copyToClipboard(text) {
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied to clipboard');
+            } else {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('Copied to clipboard');
+            }
+        } catch (error) {
+            showToast('Failed to copy - please select and copy manually');
+        }
+    }
+
+    // ============================================
+    // CRYPTO MODULE - Application-layer encryption
+    // ============================================
+    
+    const Crypto = {
+        // Base64 encoding/decoding helpers
+        arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        },
+        
+        base64ToArrayBuffer(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes.buffer;
+        },
+        
+        // Generate random bytes
+        generateRandomBytes(length) {
+            const array = new Uint8Array(length);
+            crypto.getRandomValues(array);
+            return array.buffer;
+        },
+        
+        // Derive AES-GCM key from passphrase using PBKDF2
+        async deriveKey(passphrase, saltBuffer) {
+            const encoder = new TextEncoder();
+            const passphraseBuffer = encoder.encode(passphrase);
+            
+            // Import passphrase as key material
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                passphraseBuffer,
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+            
+            // Derive AES-GCM key
+            const key = await crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: saltBuffer,
+                    iterations: 150000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                {
+                    name: 'AES-GCM',
+                    length: 256
+                },
+                false,
+                ['encrypt', 'decrypt']
+            );
+            
+            return key;
+        },
+        
+        // Encrypt plaintext with AES-GCM
+        async encrypt(key, plaintext) {
+            const encoder = new TextEncoder();
+            const plaintextBuffer = encoder.encode(plaintext);
+            const iv = this.generateRandomBytes(12);
+            
+            const ciphertext = await crypto.subtle.encrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                plaintextBuffer
+            );
+            
+            return {
+                ivB64: this.arrayBufferToBase64(iv),
+                ctB64: this.arrayBufferToBase64(ciphertext)
+            };
+        },
+        
+        // Decrypt ciphertext with AES-GCM
+        async decrypt(key, ivB64, ctB64) {
+            const iv = this.base64ToArrayBuffer(ivB64);
+            const ciphertext = this.base64ToArrayBuffer(ctB64);
+            
+            const plaintext = await crypto.subtle.decrypt(
+                {
+                    name: 'AES-GCM',
+                    iv: iv
+                },
+                key,
+                ciphertext
+            );
+            
+            const decoder = new TextDecoder();
+            return decoder.decode(plaintext);
+        }
+    };
+
+    // ============================================
+    // RTC MODULE - WebRTC connection and signaling
+    // ============================================
+    
+    const RTC = {
+        peerConnection: null,
+        dataChannel: null,
+        isHost: false,
+        encryptionKey: null,
+        salt: null,
+        handshakeComplete: false,
+        
+        // Configuration constants
+        ICE_GATHERING_TIMEOUT: 30000, // 30 seconds
+        
+        // STUN server configuration
+        stunServers: [
+            'stun:stun.l.google.com:19302',
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302'
+        ],
+        
+        // Initialize peer connection
+        createPeerConnection() {
+            const config = {
+                iceServers: this.stunServers.map(url => ({ urls: url }))
+            };
+            
+            this.peerConnection = new RTCPeerConnection(config);
+            
+            // ICE candidate handling
+            this.peerConnection.onicecandidate = (event) => {
+                // Using non-trickle ICE, so we wait for gathering to complete
+            };
+            
+            // Connection state changes
+            this.peerConnection.onconnectionstatechange = () => {
+                const state = this.peerConnection.connectionState;
+                console.log('Connection state:', state);
+                
+                if (state === 'connected') {
+                    updateCollabStatus('Connected');
+                } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                    this.handleDisconnect();
+                }
+            };
+            
+            return this.peerConnection;
+        },
+        
+        // Create data channel (host)
+        createDataChannel() {
+            this.dataChannel = this.peerConnection.createDataChannel('lifepad-collab', {
+                ordered: true
+            });
+            
+            this.setupDataChannelHandlers();
+            return this.dataChannel;
+        },
+        
+        // Setup data channel event handlers
+        setupDataChannelHandlers() {
+            this.dataChannel.onopen = async () => {
+                console.log('Data channel opened');
+                // Start encrypted handshake
+                await this.sendHandshake();
+            };
+            
+            this.dataChannel.onclose = () => {
+                console.log('Data channel closed');
+                this.handleDisconnect();
+            };
+            
+            this.dataChannel.onerror = (error) => {
+                console.error('Data channel error:', error);
+                showCollabError('Data channel error occurred');
+            };
+            
+            this.dataChannel.onmessage = async (event) => {
+                try {
+                    await this.handleMessage(event.data);
+                } catch (error) {
+                    console.error('Message handling error:', error);
+                }
+            };
+        },
+        
+        // Create offer (host)
+        async createOffer(passphrase) {
+            this.isHost = true;
+            this.salt = Crypto.generateRandomBytes(16);
+            this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
+            
+            this.createPeerConnection();
+            this.createDataChannel();
+            
+            const offer = await this.peerConnection.createOffer();
+            await this.peerConnection.setLocalDescription(offer);
+            
+            // Wait for ICE gathering to complete
+            await this.waitForICEGathering();
+            
+            // Return offer blob
+            return {
+                app: 'lifePAD',
+                v: 1,
+                type: 'offer',
+                sdp: this.peerConnection.localDescription.sdp,
+                saltB64: Crypto.arrayBufferToBase64(this.salt)
+            };
+        },
+        
+        // Apply answer (host)
+        async applyAnswer(answerBlob) {
+            const answer = {
+                type: 'answer',
+                sdp: answerBlob.sdp
+            };
+            
+            await this.peerConnection.setRemoteDescription(answer);
+        },
+        
+        // Create answer (joiner)
+        async createAnswer(passphrase, offerBlob) {
+            this.isHost = false;
+            this.salt = Crypto.base64ToArrayBuffer(offerBlob.saltB64);
+            this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
+            
+            this.createPeerConnection();
+            
+            // Setup data channel handler for joiner
+            this.peerConnection.ondatachannel = (event) => {
+                this.dataChannel = event.channel;
+                this.setupDataChannelHandlers();
+            };
+            
+            const offer = {
+                type: 'offer',
+                sdp: offerBlob.sdp
+            };
+            
+            await this.peerConnection.setRemoteDescription(offer);
+            const answer = await this.peerConnection.createAnswer();
+            await this.peerConnection.setLocalDescription(answer);
+            
+            // Wait for ICE gathering to complete
+            await this.waitForICEGathering();
+            
+            // Return answer blob
+            return {
+                app: 'lifePAD',
+                v: 1,
+                type: 'answer',
+                sdp: this.peerConnection.localDescription.sdp,
+                saltB64: offerBlob.saltB64 // Echo back salt
+            };
+        },
+        
+        // Wait for ICE gathering to complete
+        waitForICEGathering() {
+            return new Promise((resolve, reject) => {
+                if (this.peerConnection.iceGatheringState === 'complete') {
+                    resolve();
+                    return;
+                }
+                
+                const timeout = setTimeout(() => {
+                    reject(new Error('ICE gathering timeout'));
+                }, this.ICE_GATHERING_TIMEOUT);
+                
+                this.peerConnection.addEventListener('icegatheringstatechange', () => {
+                    if (this.peerConnection.iceGatheringState === 'complete') {
+                        clearTimeout(timeout);
+                        resolve();
+                    }
+                });
+            });
+        },
+        
+        // Send encrypted handshake
+        async sendHandshake() {
+            const nonce = Crypto.arrayBufferToBase64(Crypto.generateRandomBytes(16));
+            const handshake = {
+                kind: 'hello',
+                nonce: nonce,
+                time: Date.now()
+            };
+            
+            await this.sendEncrypted(handshake);
+        },
+        
+        // Handle incoming message
+        async handleMessage(data) {
+            try {
+                // Parse encrypted envelope
+                const envelope = JSON.parse(data);
+                
+                // Decrypt payload
+                const plaintext = await Crypto.decrypt(
+                    this.encryptionKey,
+                    envelope.ivB64,
+                    envelope.ctB64
+                );
+                
+                const message = JSON.parse(plaintext);
+                
+                // Route message by kind
+                if (message.kind === 'hello') {
+                    await this.handleHello(message);
+                } else if (message.kind === 'hello_ack') {
+                    await this.handleHelloAck(message);
+                } else if (message.kind === 'snapshot') {
+                    Sync.handleSnapshot(message);
+                } else if (message.kind === 'draw_event') {
+                    Sync.handleDrawEvent(message);
+                }
+                
+            } catch (error) {
+                console.error('Decryption failed:', error);
+                showCollabError('Key mismatch - wrong passphrase');
+                this.disconnect();
+            }
+        },
+        
+        // Handle hello handshake
+        async handleHello(message) {
+            // Send ack back
+            const ack = {
+                kind: 'hello_ack',
+                nonce: message.nonce
+            };
+            
+            await this.sendEncrypted(ack);
+            
+            // Mark handshake complete
+            this.handshakeComplete = true;
+            updateCollabStatus('Encrypted session active');
+            
+            // If host, send snapshot
+            if (this.isHost) {
+                await Sync.sendSnapshot();
+            }
+        },
+        
+        // Handle hello ack
+        async handleHelloAck(message) {
+            this.handshakeComplete = true;
+            updateCollabStatus('Encrypted session active');
+        },
+        
+        // Send encrypted message
+        async sendEncrypted(payload) {
+            if (!this.dataChannel || this.dataChannel.readyState !== 'open') {
+                throw new Error('Data channel not open');
+            }
+            
+            const plaintext = JSON.stringify(payload);
+            const encrypted = await Crypto.encrypt(this.encryptionKey, plaintext);
+            
+            const envelope = {
+                v: 1,
+                ivB64: encrypted.ivB64,
+                ctB64: encrypted.ctB64
+            };
+            
+            this.dataChannel.send(JSON.stringify(envelope));
+        },
+        
+        // Disconnect
+        disconnect() {
+            if (this.dataChannel) {
+                this.dataChannel.close();
+                this.dataChannel = null;
+            }
+            
+            if (this.peerConnection) {
+                this.peerConnection.close();
+                this.peerConnection = null;
+            }
+            
+            this.isHost = false;
+            this.encryptionKey = null;
+            this.salt = null;
+            this.handshakeComplete = false;
+            
+            updateCollabStatus('Disconnected');
+        },
+        
+        // Handle disconnect
+        handleDisconnect() {
+            showToast('Collaboration session ended');
+            this.disconnect();
+        }
+    };
+
+    // ============================================
+    // SYNC MODULE - Drawing event synchronization
+    // ============================================
+    
+    const Sync = {
+        eventLog: [],
+        maxEvents: 1000,
+        currentStrokeId: null,
+        processedEventIds: new Set(),
+        strokeBeginEvents: new Map(), // Cache for stroke begin events by ID
+        
+        // Generate unique event ID
+        generateEventId() {
+            return Date.now() + '_' + Math.random().toString(36).slice(2, 11);
+        },
+        
+        // Normalize point to 0..1 range
+        normalizePoint(x, y) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: x / rect.width,
+                y: y / rect.height
+            };
+        },
+        
+        // Denormalize point from 0..1 range
+        denormalizePoint(nx, ny) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: nx * rect.width,
+                y: ny * rect.height
+            };
+        },
+        
+        // Create stroke_begin event
+        createStrokeBegin(x, y, pressure) {
+            const normalized = this.normalizePoint(x, y);
+            const event = {
+                kind: 'draw_event',
+                type: 'stroke_begin',
+                id: this.generateEventId(),
+                t: Date.now(),
+                brush: {
+                    color: state.currentColor,
+                    size: state.currentSize,
+                    texture: state.currentTexture,
+                    erase: state.isEraser
+                },
+                p: {
+                    x: normalized.x,
+                    y: normalized.y,
+                    pressure: pressure
+                }
+            };
+            
+            this.currentStrokeId = event.id;
+            this.strokeBeginEvents.set(event.id, event);
+            this.addEvent(event);
+            return event;
+        },
+        
+        // Create stroke_point event
+        createStrokePoint(x, y, pressure) {
+            if (!this.currentStrokeId) return null;
+            
+            const normalized = this.normalizePoint(x, y);
+            const event = {
+                kind: 'draw_event',
+                type: 'stroke_point',
+                id: this.currentStrokeId,
+                t: Date.now(),
+                p: {
+                    x: normalized.x,
+                    y: normalized.y,
+                    pressure: pressure
+                }
+            };
+            
+            this.addEvent(event);
+            return event;
+        },
+        
+        // Create stroke_end event
+        createStrokeEnd() {
+            if (!this.currentStrokeId) return null;
+            
+            const event = {
+                kind: 'draw_event',
+                type: 'stroke_end',
+                id: this.currentStrokeId,
+                t: Date.now()
+            };
+            
+            this.addEvent(event);
+            this.currentStrokeId = null;
+            return event;
+        },
+        
+        // Create clear event
+        createClearEvent() {
+            const event = {
+                kind: 'draw_event',
+                type: 'clear',
+                t: Date.now()
+            };
+            
+            this.addEvent(event);
+            return event;
+        },
+        
+        // Add event to log
+        addEvent(event) {
+            this.eventLog.push(event);
+            
+            // Cap log size
+            if (this.eventLog.length > this.maxEvents) {
+                this.eventLog.shift();
+            }
+            
+            // Broadcast if connected
+            if (RTC.handshakeComplete) {
+                RTC.sendEncrypted(event).catch(err => {
+                    console.error('Failed to send event:', err);
+                });
+            }
+        },
+        
+        // Send snapshot to peer
+        async sendSnapshot() {
+            const rect = canvas.getBoundingClientRect();
+            const snapshot = {
+                kind: 'snapshot',
+                events: this.eventLog,
+                canvas: {
+                    w: rect.width,
+                    h: rect.height,
+                    bg: canvasContainer.classList.contains('paper-mode') ? 'paper' : 'white'
+                }
+            };
+            
+            await RTC.sendEncrypted(snapshot);
+        },
+        
+        // Handle snapshot from peer
+        handleSnapshot(snapshot) {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Apply background
+            if (snapshot.canvas.bg === 'paper' && !state.paperMode) {
+                paperBgCheckbox.checked = true;
+                togglePaperMode();
+            }
+            
+            // Replay events
+            snapshot.events.forEach(event => {
+                this.replayEvent(event);
+            });
+            
+            showToast('Canvas synchronized');
+        },
+        
+        // Handle draw event from peer
+        handleDrawEvent(event) {
+            // Check for duplicates
+            const eventKey = event.id + '_' + event.t;
+            if (this.processedEventIds.has(eventKey)) {
+                return;
+            }
+            this.processedEventIds.add(eventKey);
+            
+            // Limit processed IDs set size with FIFO approach
+            if (this.processedEventIds.size > this.maxEvents) {
+                // Convert to array, remove oldest items, convert back
+                const ids = Array.from(this.processedEventIds);
+                const toRemove = ids.slice(0, this.processedEventIds.size - this.maxEvents);
+                toRemove.forEach(id => this.processedEventIds.delete(id));
+            }
+            
+            this.replayEvent(event);
+        },
+        
+        // Replay a single event
+        replayEvent(event) {
+            if (event.type === 'stroke_begin') {
+                const point = this.denormalizePoint(event.p.x, event.p.y);
+                
+                // Cache the begin event for later lookup
+                this.strokeBeginEvents.set(event.id, event);
+                
+                // Set brush state
+                state.lastX = point.x;
+                state.lastY = point.y;
+                
+                // Save for undo
+                saveHistoryState();
+                
+            } else if (event.type === 'stroke_point') {
+                const point = this.denormalizePoint(event.p.x, event.p.y);
+                
+                // Draw stroke segment
+                const pressure = event.p.pressure || 1;
+                
+                // Get brush from cached begin event
+                const beginEvent = this.strokeBeginEvents.get(event.id);
+                
+                if (beginEvent) {
+                    // Draw with remote brush settings
+                    this.drawRemoteStroke(
+                        state.lastX,
+                        state.lastY,
+                        point.x,
+                        point.y,
+                        beginEvent.brush,
+                        pressure
+                    );
+                }
+                
+                state.lastX = point.x;
+                state.lastY = point.y;
+                
+            } else if (event.type === 'stroke_end') {
+                // Clean up cached begin event
+                this.strokeBeginEvents.delete(event.id);
+                
+                // Autosave
+                saveCanvasToStorage();
+                
+            } else if (event.type === 'clear') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                saveCanvasToStorage();
+            }
+        },
+        
+        // Draw remote stroke with specified brush
+        drawRemoteStroke(x1, y1, x2, y2, brush, pressure) {
+            const size = brush.size * pressure;
+            
+            if (brush.erase) {
+                drawEraser(x1, y1, x2, y2, size);
+            } else {
+                // Save current state
+                const savedColor = state.currentColor;
+                const savedTexture = state.currentTexture;
+                
+                // Apply remote brush
+                state.currentColor = brush.color;
+                state.currentTexture = brush.texture;
+                
+                // Draw
+                switch (brush.texture) {
+                    case 'ink':
+                        drawInk(x1, y1, x2, y2, size);
+                        break;
+                    case 'pencil':
+                        drawPencil(x1, y1, x2, y2, size);
+                        break;
+                    case 'marker':
+                        drawMarker(x1, y1, x2, y2, size);
+                        break;
+                    case 'spray':
+                        drawSpray(x1, y1, x2, y2, size);
+                        break;
+                    case 'charcoal':
+                        drawCharcoal(x1, y1, x2, y2, size);
+                        break;
+                }
+                
+                // Restore state
+                state.currentColor = savedColor;
+                state.currentTexture = savedTexture;
+            }
+        }
+    };
+
 })();

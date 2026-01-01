@@ -20,7 +20,8 @@ lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free d
 - Save drawings as PNG images
 - Light and Dark theme modes
 - Optional paper background (warm off-white)
-- Works completely offline
+- Real-time peer-to-peer collaboration with end-to-end encryption
+- Works completely offline (solo mode)
 - No external dependencies or CDN usage
 
 ## How to Run Locally
@@ -73,6 +74,102 @@ Note: The service worker requires HTTPS in production, but works with localhost 
 9. Visit your site and it should be live
 
 The PWA will work immediately, and users can install it to their home screen.
+
+## Collaboration Feature
+
+lifePAD supports true peer-to-peer collaboration with manual copy/paste signaling and end-to-end encryption. No backend servers required - works entirely on GitHub Pages.
+
+### How It Works
+
+Two people can draw together in real-time by establishing a WebRTC connection:
+
+1. One person hosts a session
+2. Another person joins the session
+3. Both use manual copy/paste to exchange connection information
+4. Once connected, drawing strokes are synchronized in real-time with application-layer encryption
+
+### Security
+
+- Session passphrase is never transmitted
+- All drawing data is encrypted using AES-GCM before being sent over the data channel
+- Key derivation uses PBKDF2 with 150,000 iterations
+- Transport is encrypted by WebRTC (DTLS-SRTP)
+- Additional application-layer encryption ensures end-to-end privacy
+
+### How to Use
+
+#### Host a Session
+
+1. Click the "Collab" button in the navbar
+2. Go to the "Host Session" tab
+3. Enter a strong passphrase (shared secretly with your partner)
+4. Click "Create offer" and wait for the offer blob to appear
+5. Copy the offer blob and send it to your partner (via chat, email, etc.)
+6. Wait for your partner to send back the answer blob
+7. Paste the answer blob and click "Apply answer"
+8. Connection will establish and you can start drawing together
+
+#### Join a Session
+
+1. Click the "Collab" button in the navbar
+2. Go to the "Join Session" tab
+3. Enter the same passphrase as the host
+4. Paste the offer blob received from the host
+5. Click "Create answer" and wait for the answer blob to appear
+6. Copy the answer blob and send it back to the host
+7. Wait for the host to apply your answer
+8. Connection will establish and the canvas will sync
+
+### Connection Status
+
+The status indicator in the navbar shows your current connection state:
+
+- **Disconnected**: No active collaboration session
+- **Creating offer**: Host is generating connection offer
+- **Waiting for answer**: Host is waiting for joiner to respond
+- **Ready to join**: Joiner has received offer and is creating answer
+- **Connecting**: WebRTC connection is being established
+- **Connected**: WebRTC connection is active
+- **Encrypted session active**: Handshake complete, ready to draw
+
+### Technical Details
+
+- Uses WebRTC DataChannels for peer-to-peer communication
+- Manual signaling via copy/paste (no signaling server)
+- Non-trickle ICE gathering for simpler blob format
+- STUN servers for NAT traversal (no TURN, so some restrictive networks may not connect)
+- Vector-based stroke events with normalized coordinates for cross-device support
+- Automatic canvas synchronization when connection is established
+
+### Testing Collaboration
+
+#### Same Network Test
+- Use two devices on the same WiFi network
+- Or use two browser windows/tabs (for testing UI only)
+
+#### Different Networks Test
+- Use devices on different networks
+- Note: Without TURN servers, connections through symmetric NATs may fail
+- Most home and mobile networks should work fine
+
+#### Passphrase Mismatch Test
+- Try using different passphrases on host and joiner
+- Should fail safely with "Key mismatch" error
+
+### Troubleshooting
+
+**Connection fails:**
+- Check that both users entered the exact same passphrase
+- Try again on a less restrictive network
+- Some corporate or mobile networks may block WebRTC
+
+**ICE gathering timeout:**
+- Check your internet connection
+- Try refreshing the page and creating a new session
+
+**Key mismatch error:**
+- Verify both users are using the exact same passphrase
+- Passphrases are case-sensitive
 
 ## How to Install as a PWA
 
