@@ -42,10 +42,12 @@
     let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
+    // PWA install elements
+    let installBtn, iosInstallModal, closeIosInstall;
+    // Text and select tool elements
     let selectToolBtn, textToolBtn, textDialog, textInput, textConfirmBtn, textCancelBtn;
-    let collabBtn;
     // Collaboration elements
-    let collabModal, closeCollabModal, collabStatus, collabError;
+    let collabBtn, collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
     let hostPassphrase, createOfferBtn, offerBlob, offerOutput, copyOfferBtn;
     let answerBlobInput, answerInput, applyAnswerBtn;
@@ -93,15 +95,22 @@
         rulerScaleSlider = document.getElementById('ruler-scale');
         rulerScaleValue = document.getElementById('ruler-scale-value');
         rulerResetBtn = document.getElementById('ruler-reset');
+        
+        // PWA install elements
+        installBtn = document.getElementById('install-btn');
+        iosInstallModal = document.getElementById('ios-install-modal');
+        closeIosInstall = document.getElementById('close-ios-install');
+        
+        // Text and select tool elements
         selectToolBtn = document.getElementById('select-tool');
         textToolBtn = document.getElementById('text-tool');
         textDialog = document.getElementById('text-dialog');
         textInput = document.getElementById('text-input');
         textConfirmBtn = document.getElementById('text-confirm');
         textCancelBtn = document.getElementById('text-cancel');
-        collabBtn = document.getElementById('collab-btn');
         
         // Collaboration elements
+        collabBtn = document.getElementById('collab-btn');
         collabModal = document.getElementById('collab-modal');
         closeCollabModal = document.getElementById('close-collab-modal');
         collabStatus = document.getElementById('collab-status');
@@ -225,8 +234,6 @@
         
         // Collaboration
         collabBtn.addEventListener('click', openCollabModal);
-        // TODO: Add collaboration trigger button to HTML - currently no UI element exists to open the modal
-        // The collaboration modal and its functionality are implemented but lack a trigger button
         closeCollabModal.addEventListener('click', closeCollabModalFn);
         hostTabBtn.addEventListener('click', () => switchTab('host'));
         joinTabBtn.addEventListener('click', () => switchTab('join'));
@@ -273,6 +280,10 @@
             updateRulerMeasurements();
         });
         rulerResetBtn.addEventListener('click', resetRulerPositions);
+        
+        // PWA install
+        installBtn.addEventListener('click', handleInstallClick);
+        closeIosInstall.addEventListener('click', closeIosInstallModal);
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
@@ -1405,7 +1416,19 @@
         }
     }
 
-    // Service Worker registration
+    // Service Worker registration and PWA install
+    let deferredInstallPrompt = null;
+    
+    // iOS detection helper
+    function isIOSDevice() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    }
+    
+    function isStandaloneMode() {
+        return window.matchMedia('(display-mode: standalone)').matches 
+            || window.navigator.standalone === true;
+    }
+    
     function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
@@ -1417,10 +1440,7 @@
                         const newWorker = registration.installing;
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                showToast('Update available. Reload', {
-                                    text: 'Reload',
-                                    callback: () => window.location.reload()
-                                });
+                                showUpdateAvailable(newWorker);
                             }
                         });
                     });
@@ -1434,6 +1454,81 @@
                 showToast('Offline ready');
             });
         }
+        
+        // Handle PWA install prompt
+        setupInstallPrompt();
+    }
+    
+    function showUpdateAvailable(newWorker) {
+        showToast('Update available', {
+            text: 'Reload',
+            callback: () => {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                window.location.reload();
+            }
+        });
+    }
+    
+    function setupInstallPrompt() {
+        // Detect iOS and standalone mode
+        const isIOS = isIOSDevice();
+        const isStandalone = isStandaloneMode();
+        
+        if (isIOS && !isStandalone) {
+            // Show install button for iOS (will open help modal)
+            if (installBtn) {
+                installBtn.style.display = 'inline-block';
+            }
+        } else {
+            // Handle beforeinstallprompt for Android/Desktop
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredInstallPrompt = e;
+                
+                // Show install button
+                if (installBtn) {
+                    installBtn.style.display = 'inline-block';
+                }
+            });
+            
+            // Handle successful install
+            window.addEventListener('appinstalled', () => {
+                deferredInstallPrompt = null;
+                if (installBtn) {
+                    installBtn.style.display = 'none';
+                }
+                showToast('lifePAD installed successfully');
+            });
+        }
+    }
+    
+    function handleInstallClick() {
+        // Detect iOS
+        const isIOS = isIOSDevice();
+        
+        if (isIOS) {
+            // Show iOS install instructions
+            iosInstallModal.classList.remove('hidden');
+        } else if (deferredInstallPrompt) {
+            // Show install prompt for Android/Desktop
+            deferredInstallPrompt.prompt();
+            
+            deferredInstallPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                    if (installBtn) {
+                        installBtn.style.display = 'none';
+                    }
+                } else {
+                    console.log('User dismissed the install prompt');
+                }
+                deferredInstallPrompt = null;
+            });
+        }
+    }
+    
+    function closeIosInstallModal() {
+        iosInstallModal.classList.add('hidden');
     }
 
     // Initialize when DOM is ready

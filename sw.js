@@ -1,8 +1,8 @@
 // Service Worker for lifePAD
 // Provides offline functionality and caching
 
-const CACHE_VERSION = 'v1';
-const CACHE_NAME = `lifepad-${CACHE_VERSION}`;
+const CACHE_VERSION = 'v2';
+const CACHE_NAME = `lifepad-cache-${CACHE_VERSION}`;
 
 // Files to cache for offline use
 const STATIC_ASSETS = [
@@ -11,8 +11,10 @@ const STATIC_ASSETS = [
     './styles.css',
     './app.js',
     './manifest.webmanifest',
+    './favicon.png',
     './icons/icon-192.png',
-    './icons/icon-512.png'
+    './icons/icon-512.png',
+    './icons/apple-touch-icon.png'
 ];
 
 // Install event - cache static assets
@@ -45,8 +47,39 @@ self.addEventListener('activate', event => {
     );
 });
 
-// Fetch event - serve from cache first, fallback to network
+// Listen for skip waiting message
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
+
+// Fetch event - cache-first for assets, network-first for HTML
 self.addEventListener('fetch', event => {
+    const url = new URL(event.request.url);
+    
+    // Network-first for HTML to get updates quickly
+    if (event.request.destination === 'document' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    if (response && response.status === 200) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then(cache => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    }
+                    return response;
+                })
+                .catch(() => {
+                    return caches.match(event.request)
+                        .then(cachedResponse => cachedResponse || caches.match('./index.html'));
+                })
+        );
+        return;
+    }
+    
+    // Cache-first for all other assets
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
@@ -65,8 +98,8 @@ self.addEventListener('fetch', event => {
                         const responseToCache = response.clone();
                         
                         // Cache new responses for static assets
-                        if (event.request.url.includes('icon-') || 
-                            event.request.url.endsWith('.html') ||
+                        if (event.request.url.includes('/icons/') || 
+                            event.request.url.includes('favicon.png') ||
                             event.request.url.endsWith('.css') ||
                             event.request.url.endsWith('.js') ||
                             event.request.url.endsWith('.webmanifest')) {
@@ -80,12 +113,6 @@ self.addEventListener('fetch', event => {
                         }
                         
                         return response;
-                    })
-                    .catch(() => {
-                        // Return offline page or fallback if available
-                        if (event.request.destination === 'document') {
-                            return caches.match('./index.html');
-                        }
                     });
             })
     );

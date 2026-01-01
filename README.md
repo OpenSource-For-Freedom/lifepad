@@ -186,31 +186,83 @@ The status indicator in the navbar shows your current connection state:
 
 ## How to Install as a PWA
 
+lifePAD is a Progressive Web App (PWA) that can be installed on your device like a native app. Once installed, it works offline and provides a fullscreen app experience.
+
 ### On iOS (iPhone/iPad)
 
-1. Open the lifePAD website in Safari
-2. Tap the Share button (square with arrow pointing up)
-3. Scroll down and tap "Add to Home Screen"
-4. Edit the name if desired, then tap "Add"
+1. Open the lifePAD website in Safari (https://opensource-for-freedom.github.io/lifepad/)
+2. Tap the **Share** button at the bottom of Safari (square with arrow pointing up)
+3. Scroll down and tap **"Add to Home Screen"**
+4. Edit the name if desired, then tap **"Add"**
 5. The lifePAD icon will appear on your home screen
-6. Launch it like any other app - it will open in fullscreen mode
+6. Launch it like any other app - it will open in fullscreen mode without Safari's UI
 
-### On Android
+**Note:** The Install button in the app will show instructions specific to iOS when clicked.
 
-1. Open the lifePAD website in Chrome
-2. Tap the three-dot menu in the top right
-3. Select "Add to Home screen" or "Install app"
-4. Confirm the installation
+### On Android (Chrome)
+
+1. Open the lifePAD website in Chrome (https://opensource-for-freedom.github.io/lifepad/)
+2. Look for the **"Install"** button in the app's toolbar (or Chrome may show a prompt automatically)
+3. Click **"Install"** and confirm
+4. Alternatively, tap the three-dot menu and select **"Add to Home screen"** or **"Install app"**
 5. The lifePAD icon will appear in your app drawer and home screen
 6. Launch it like any other app
 
-### On Desktop (Chrome/Edge)
+### On Desktop (Chrome/Edge/Opera)
 
-1. Open the lifePAD website
-2. Look for the install icon in the address bar (plus sign or computer icon)
-3. Click it and confirm the installation
-4. The app will open in its own window
-5. Access it from your Start menu or Applications folder
+1. Open the lifePAD website in your browser (https://opensource-for-freedom.github.io/lifepad/)
+2. Look for the **"Install"** button in the app's toolbar
+3. Click it to install, or look for the install icon in the address bar (computer icon or plus sign)
+4. Click and confirm the installation
+5. The app will open in its own window
+6. Access it from your Start menu (Windows), Applications folder (Mac), or app launcher (Linux)
+
+**Tip:** Once installed, lifePAD launches in standalone mode without browser chrome for a clean, app-like experience.
+
+## Offline Behavior
+
+Once you've loaded lifePAD at least once:
+
+- **Works completely offline**: All drawing features work without internet
+- **App shell cached**: The app loads instantly from cache
+- **Automatic updates**: When online, the app checks for updates and shows an "Update available" prompt
+- **Manual refresh**: Click "Reload" in the update prompt to get the latest version
+- **Your drawings persist**: All work is saved locally in your browser's storage
+
+### What Gets Cached
+
+- App shell (HTML, CSS, JavaScript)
+- Icons and manifest
+- All static assets needed to run
+
+### Update Behavior
+
+- **Network-first for HTML**: The app checks for HTML updates when online
+- **Cache-first for assets**: CSS, JS, and images load from cache for speed
+- **User-controlled updates**: You decide when to reload for updates (via prompt)
+- **Seamless transition**: Updates download in background, apply on reload
+
+## PWA Features
+
+- **Installable**: Add to home screen on mobile or install on desktop
+- **Offline-first**: Works without internet after first visit
+- **Fast loading**: Cached assets load instantly
+- **Standalone mode**: Runs in its own window without browser UI
+- **iOS support**: Full Add to Home Screen support on iOS Safari
+- **Android support**: Full PWA install support on Chrome
+- **Desktop support**: Install on Windows, Mac, and Linux via Chrome/Edge
+
+## Browser Support for PWA Features
+
+### Full PWA Support
+- Chrome 80+ (Android, Windows, Mac, Linux)
+- Edge 80+ (Windows, Mac, Linux)
+- Opera 67+
+- Samsung Internet 12+
+
+### Add to Home Screen Support
+- Safari 13.1+ (iOS)
+- Safari 14+ (macOS)
 
 ## Why Choose lifePAD?
 
