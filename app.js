@@ -18,21 +18,23 @@
         maxHistory: 30,
         paperMode: false,
         theme: 'light',
-        currentShape: null,
+        activeTool: 'brush', // 'brush', 'eraser', 'select', 'text', 'shape'
+        activeShape: null, // 'rectangle', 'circle', 'ellipse', 'line', 'arrow', 'triangle', 'diamond', 'star'
         shapeFill: false,
-        shapeRough: false,
+        shapeHandDrawn: false,
         isDrawingShape: false,
         shapeStartX: 0,
         shapeStartY: 0,
-        currentTool: 'brush', // 'brush', 'select', 'text', 'shape'
         selectedObject: null,
         objects: [], // Array of drawable objects (shapes, text)
         textX: 0,
-        textY: 0
+        textY: 0,
+        currentPointerId: null
     };
 
     // DOM elements
     let canvas, ctx, canvasContainer;
+    let overlayCanvas, overlayCtx;
     let introOverlay, startBtn, sampleBtn, dontShowAgainCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
     let brushTextureSelect, brushEraserToggle;
@@ -42,6 +44,7 @@
     let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
+    let toolStatus;
     // PWA install elements
     let installBtn, iosInstallModal, closeIosInstall;
     // Text and select tool elements
@@ -59,7 +62,10 @@
         // Get DOM elements
         canvas = document.getElementById('drawing-canvas');
         ctx = canvas.getContext('2d', { willReadFrequently: false });
+        overlayCanvas = document.getElementById('overlay-canvas');
+        overlayCtx = overlayCanvas.getContext('2d', { willReadFrequently: false });
         canvasContainer = document.getElementById('canvas-container');
+        toolStatus = document.getElementById('tool-status');
         introOverlay = document.getElementById('intro-overlay');
         startBtn = document.getElementById('start-drawing');
         sampleBtn = document.getElementById('sample-canvas');
@@ -169,14 +175,21 @@
         // Save current drawing
         const imageData = canvas.toDataURL();
         
-        // Resize canvas
+        // Resize main canvas
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
         
-        // Scale context for high DPI
-        ctx.scale(dpr, dpr);
+        // Scale context for high DPI - apply transform so we can draw in CSS pixels
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        
+        // Resize overlay canvas with same dimensions and transform
+        overlayCanvas.width = rect.width * dpr;
+        overlayCanvas.height = rect.height * dpr;
+        overlayCanvas.style.width = rect.width + 'px';
+        overlayCanvas.style.height = rect.height + 'px';
+        overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
         // Restore drawing
         if (imageData && imageData !== 'data:,') {
@@ -263,9 +276,11 @@
         });
         shapeFillCheckbox.addEventListener('change', function() {
             state.shapeFill = this.checked;
+            console.log('Shape fill:', state.shapeFill);
         });
         shapeRoughCheckbox.addEventListener('change', function() {
-            state.shapeRough = this.checked;
+            state.shapeHandDrawn = this.checked;
+            console.log('Shape hand-drawn:', state.shapeHandDrawn);
         });
 
         // Text dialog
@@ -323,20 +338,28 @@
         state.isEraser = !state.isEraser;
         brushEraserToggle.textContent = state.isEraser ? 'Eraser' : 'Brush';
         brushEraserToggle.classList.toggle('active', state.isEraser);
-        state.currentTool = 'brush';
+        state.activeTool = state.isEraser ? 'eraser' : 'brush';
+        state.activeShape = null; // Clear shape mode
         updateToolButtons();
+        updateToolStatus();
     }
 
     // Tool activation
     function activateSelectTool() {
-        state.currentTool = 'select';
+        state.activeTool = 'select';
+        state.activeShape = null;
+        state.isEraser = false;
         updateToolButtons();
+        updateToolStatus();
         showToast('Select tool activated - click objects to select');
     }
 
     function activateTextTool() {
-        state.currentTool = 'text';
+        state.activeTool = 'text';
+        state.activeShape = null;
+        state.isEraser = false;
         updateToolButtons();
+        updateToolStatus();
         showToast('Text tool activated - click to place text');
     }
 
@@ -347,13 +370,37 @@
         textToolBtn.classList.remove('active');
         
         // Set active state for current tool
-        if (state.currentTool === 'brush' || state.currentTool === 'eraser') {
+        if (state.activeTool === 'brush' || state.activeTool === 'eraser') {
             brushEraserToggle.classList.add('active');
-        } else if (state.currentTool === 'select') {
+        } else if (state.activeTool === 'select') {
             selectToolBtn.classList.add('active');
-        } else if (state.currentTool === 'text') {
+        } else if (state.activeTool === 'text') {
             textToolBtn.classList.add('active');
+        } else if (state.activeTool === 'shape') {
+            // No button to highlight for shapes - it's in the panel
         }
+    }
+
+    function updateToolStatus() {
+        if (!toolStatus) return;
+        
+        let statusText = 'Tool: ';
+        if (state.activeTool === 'shape' && state.activeShape) {
+            statusText += `Shape / ${state.activeShape}`;
+        } else if (state.activeTool === 'brush') {
+            statusText += 'Brush';
+        } else if (state.activeTool === 'eraser') {
+            statusText += 'Eraser';
+        } else if (state.activeTool === 'select') {
+            statusText += 'Select';
+        } else if (state.activeTool === 'text') {
+            statusText += 'Text';
+        } else {
+            statusText += state.activeTool;
+        }
+        
+        toolStatus.textContent = statusText;
+        console.log('Tool status updated:', statusText);
     }
 
     // Text tool functions
@@ -435,34 +482,62 @@
     function startDrawing(e) {
         e.preventDefault();
         
+        // Only handle one pointer at a time
+        if (state.currentPointerId !== null && state.currentPointerId !== e.pointerId) {
+            console.log('Ignoring pointer - already tracking', state.currentPointerId);
+            return;
+        }
+        
+        state.currentPointerId = e.pointerId;
+        try {
+            canvas.setPointerCapture(e.pointerId);
+        } catch (err) {
+            // Pointer capture may fail in some cases, that's okay
+            console.log('setPointerCapture failed:', err.message);
+        }
+        
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+        
+        console.log('pointerdown:', {
+            activeTool: state.activeTool,
+            activeShape: state.activeShape,
+            pointerType: e.pointerType,
+            pointerId: e.pointerId,
+            x, y
+        });
 
         // Handle text tool
-        if (state.currentTool === 'text') {
+        if (state.activeTool === 'text') {
             state.textX = x;
             state.textY = y;
             textDialog.classList.remove('hidden');
             textInput.focus();
+            state.currentPointerId = null;
             return;
         }
 
         // Handle select tool
-        if (state.currentTool === 'select') {
-            // For now, just show a message
+        if (state.activeTool === 'select') {
             showToast('Select tool - object selection coming soon');
+            state.currentPointerId = null;
             return;
         }
         
-        if (state.currentShape) {
-            // Drawing a shape
+        // Handle shape tool
+        if (state.activeTool === 'shape' && state.activeShape) {
             state.isDrawingShape = true;
             state.shapeStartX = x;
             state.shapeStartY = y;
+            // Save state ONCE at start for undo
             saveHistoryState();
-        } else {
-            // Normal drawing
+            console.log('Shape drawing started:', state.activeShape);
+            return;
+        }
+        
+        // Handle brush/eraser tool
+        if (state.activeTool === 'brush' || state.activeTool === 'eraser') {
             state.isDrawing = true;
             state.lastX = x;
             state.lastY = y;
@@ -473,33 +548,39 @@
             // Start path
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
+            
+            // Create sync event
+            Sync.createStrokeBegin(x, y, e.pressure || 1);
+            return;
         }
     }
 
     function draw(e) {
         e.preventDefault();
         
-        if (state.isDrawingShape) {
-            // Preview shape while dragging
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Restore previous state to clear preview
-            if (state.historyStep >= 0) {
-                restoreHistoryState(state.history[state.historyStep]);
-            }
-            
-            // Draw shape preview
-            drawShape(state.shapeStartX, state.shapeStartY, x, y, state.currentShape, true);
+        // Only handle the tracked pointer
+        if (state.currentPointerId !== e.pointerId) {
             return;
         }
-        
-        if (!state.isDrawing) return;
         
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
+        
+        // Handle shape preview
+        if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
+            // Clear overlay
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            
+            // Draw shape preview on overlay
+            drawShapePreview(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
+            return;
+        }
+        
+        // Handle brush/eraser drawing
+        if (!state.isDrawing || (state.activeTool !== 'brush' && state.activeTool !== 'eraser')) {
+            return;
+        }
         
         // Get pressure if available
         const pressure = e.pressure > 0 ? e.pressure : 1;
@@ -538,32 +619,53 @@
     }
 
     function stopDrawing(e) {
-        if (!state.isDrawing && !state.isDrawingShape) return;
         e.preventDefault();
         
-        if (state.isDrawingShape) {
-            // Finalize shape
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            // Restore to clear preview
-            if (state.historyStep >= 0) {
-                restoreHistoryState(state.history[state.historyStep]);
-            }
-            
-            // Draw final shape
-            drawShape(state.shapeStartX, state.shapeStartY, x, y, state.currentShape, false);
-            state.isDrawingShape = false;
-        } else {
-            state.isDrawing = false;
+        // Only handle the tracked pointer
+        if (state.currentPointerId !== e.pointerId) {
+            return;
         }
         
-        // Create sync event
-        Sync.createStrokeEnd();
+        console.log('pointerup:', {
+            activeTool: state.activeTool,
+            activeShape: state.activeShape,
+            pointerId: e.pointerId
+        });
         
-        // Autosave after stroke
-        saveCanvasToStorage();
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // Handle shape finalization
+        if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
+            // Clear overlay
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            
+            // Draw final shape to main canvas
+            drawShapeFinal(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
+            
+            state.isDrawingShape = false;
+            console.log('Shape drawing completed:', state.activeShape);
+            
+            // Autosave
+            saveCanvasToStorage();
+            
+            state.currentPointerId = null;
+            return;
+        }
+        
+        // Handle brush/eraser finalization
+        if (state.isDrawing) {
+            state.isDrawing = false;
+            
+            // Create sync event
+            Sync.createStrokeEnd();
+            
+            // Autosave after stroke
+            saveCanvasToStorage();
+        }
+        
+        state.currentPointerId = null;
     }
 
     // Brush texture implementations
@@ -870,26 +972,52 @@
     function openShapesPanel() {
         shapesPanel.classList.remove('hidden');
         toolsMenu.classList.remove('show');
-        showToast('Click and drag to draw shapes');
+        showToast('Click a shape, then drag on canvas to draw');
     }
 
     function closeShapesPanel() {
         shapesPanel.classList.add('hidden');
-        state.currentShape = null;
+        state.activeShape = null;
+        state.activeTool = 'brush';
         shapeButtons.forEach(btn => btn.classList.remove('active'));
+        updateToolButtons();
+        updateToolStatus();
     }
 
     function selectShape(shape) {
-        state.currentShape = shape;
-        state.currentTool = 'brush'; // Switch to brush tool to enable shape drawing
-        updateToolButtons(); // Update UI to reflect tool change
+        console.log('Shape selected:', shape);
+        state.activeShape = shape;
+        state.activeTool = 'shape';
+        state.isEraser = false;
+        updateToolButtons();
+        updateToolStatus();
         shapeButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.shape === shape);
         });
         showToast(`Selected: ${shape}`);
     }
 
-    function drawShape(x1, y1, x2, y2, shape, isPreview) {
+    // Shape drawing functions
+    function drawShapePreview(x1, y1, x2, y2, shape) {
+        const width = x2 - x1;
+        const height = y2 - y1;
+        
+        overlayCtx.strokeStyle = state.currentColor;
+        overlayCtx.lineWidth = state.currentSize;
+        overlayCtx.lineCap = 'round';
+        overlayCtx.lineJoin = 'round';
+        overlayCtx.globalAlpha = 0.5;
+        
+        if (state.shapeFill) {
+            overlayCtx.fillStyle = state.currentColor;
+        }
+        
+        drawShapeGeometry(overlayCtx, x1, y1, x2, y2, width, height, shape, state.shapeFill);
+        
+        overlayCtx.globalAlpha = 1;
+    }
+
+    function drawShapeFinal(x1, y1, x2, y2, shape) {
         const width = x2 - x1;
         const height = y2 - y1;
         
@@ -897,66 +1025,51 @@
         ctx.lineWidth = state.currentSize;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        ctx.globalAlpha = 1;
         
         if (state.shapeFill) {
             ctx.fillStyle = state.currentColor;
         }
         
-        if (isPreview) {
-            ctx.globalAlpha = 0.5;
-        } else {
-            ctx.globalAlpha = 1;
+        drawShapeGeometry(ctx, x1, y1, x2, y2, width, height, shape, state.shapeFill);
+        
+        // Apply hand-drawn effect if enabled
+        if (state.shapeHandDrawn) {
+            applyHandDrawnEffect(ctx, x1, y1, x2, y2, width, height, shape);
         }
-        
-        ctx.beginPath();
-        
+    }
+
+    function drawShapeGeometry(context, x1, y1, x2, y2, width, height, shape, fill) {
         switch (shape) {
             case 'rectangle':
-                if (state.shapeFill) {
-                    ctx.fillRect(x1, y1, width, height);
+                if (fill) {
+                    context.fillRect(x1, y1, width, height);
                 } else {
-                    ctx.strokeRect(x1, y1, width, height);
+                    context.strokeRect(x1, y1, width, height);
                 }
                 break;
                 
             case 'circle':
+            case 'ellipse':
+                context.beginPath();
                 const radiusX = Math.abs(width) / 2;
                 const radiusY = Math.abs(height) / 2;
                 const centerX = x1 + width / 2;
                 const centerY = y1 + height / 2;
                 
-                ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-                if (state.shapeFill) {
-                    ctx.fill();
+                context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                if (fill) {
+                    context.fill();
                 } else {
-                    ctx.stroke();
+                    context.stroke();
                 }
                 break;
                 
             case 'line':
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
-                break;
-                
-            case 'triangle':
-                const topX = x1 + width / 2;
-                const topY = y1;
-                const leftX = x1;
-                const leftY = y2;
-                const rightX = x2;
-                const rightY = y2;
-                
-                ctx.moveTo(topX, topY);
-                ctx.lineTo(leftX, leftY);
-                ctx.lineTo(rightX, rightY);
-                ctx.closePath();
-                
-                if (state.shapeFill) {
-                    ctx.fill();
-                } else {
-                    ctx.stroke();
-                }
+                context.beginPath();
+                context.moveTo(x1, y1);
+                context.lineTo(x2, y2);
+                context.stroke();
                 break;
                 
             case 'arrow':
@@ -964,26 +1077,49 @@
                 const headLength = Math.min(20, Math.abs(width) / 3, Math.abs(height) / 3);
                 
                 // Draw line
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.stroke();
+                context.beginPath();
+                context.moveTo(x1, y1);
+                context.lineTo(x2, y2);
+                context.stroke();
                 
                 // Draw arrowhead
-                ctx.beginPath();
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
+                context.beginPath();
+                context.moveTo(x2, y2);
+                context.lineTo(
                     x2 - headLength * Math.cos(angle - Math.PI / 6),
                     y2 - headLength * Math.sin(angle - Math.PI / 6)
                 );
-                ctx.moveTo(x2, y2);
-                ctx.lineTo(
+                context.moveTo(x2, y2);
+                context.lineTo(
                     x2 - headLength * Math.cos(angle + Math.PI / 6),
                     y2 - headLength * Math.sin(angle + Math.PI / 6)
                 );
-                ctx.stroke();
+                context.stroke();
+                break;
+                
+            case 'triangle':
+                context.beginPath();
+                const topX = x1 + width / 2;
+                const topY = y1;
+                const leftX = x1;
+                const leftY = y2;
+                const rightX = x2;
+                const rightY = y2;
+                
+                context.moveTo(topX, topY);
+                context.lineTo(leftX, leftY);
+                context.lineTo(rightX, rightY);
+                context.closePath();
+                
+                if (fill) {
+                    context.fill();
+                } else {
+                    context.stroke();
+                }
                 break;
                 
             case 'star':
+                context.beginPath();
                 const centerStarX = x1 + width / 2;
                 const centerStarY = y1 + height / 2;
                 const outerRadius = Math.min(Math.abs(width), Math.abs(height)) / 2;
@@ -992,121 +1128,136 @@
                 
                 for (let i = 0; i < spikes * 2; i++) {
                     const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                    const angle = (i * Math.PI) / spikes - Math.PI / 2;
-                    const px = centerStarX + radius * Math.cos(angle);
-                    const py = centerStarY + radius * Math.sin(angle);
+                    const angleRad = (i * Math.PI) / spikes - Math.PI / 2;
+                    const px = centerStarX + radius * Math.cos(angleRad);
+                    const py = centerStarY + radius * Math.sin(angleRad);
                     
                     if (i === 0) {
-                        ctx.moveTo(px, py);
+                        context.moveTo(px, py);
                     } else {
-                        ctx.lineTo(px, py);
+                        context.lineTo(px, py);
                     }
                 }
-                ctx.closePath();
+                context.closePath();
                 
-                if (state.shapeFill) {
-                    ctx.fill();
+                if (fill) {
+                    context.fill();
                 } else {
-                    ctx.stroke();
+                    context.stroke();
                 }
                 break;
 
             case 'diamond':
+                context.beginPath();
                 const diamondCenterX = x1 + width / 2;
                 const diamondCenterY = y1 + height / 2;
                 
-                ctx.moveTo(diamondCenterX, y1); // top
-                ctx.lineTo(x2, diamondCenterY); // right
-                ctx.lineTo(diamondCenterX, y2); // bottom
-                ctx.lineTo(x1, diamondCenterY); // left
-                ctx.closePath();
+                context.moveTo(diamondCenterX, y1); // top
+                context.lineTo(x2, diamondCenterY); // right
+                context.lineTo(diamondCenterX, y2); // bottom
+                context.lineTo(x1, diamondCenterY); // left
+                context.closePath();
                 
-                if (state.shapeFill) {
-                    ctx.fill();
+                if (fill) {
+                    context.fill();
                 } else {
-                    ctx.stroke();
-                }
-                break;
-
-            case 'ellipse':
-                const ellipseRadiusX = Math.abs(width) / 2;
-                const ellipseRadiusY = Math.abs(height) / 2;
-                const ellipseCenterX = x1 + width / 2;
-                const ellipseCenterY = y1 + height / 2;
-                
-                ctx.ellipse(ellipseCenterX, ellipseCenterY, ellipseRadiusX, ellipseRadiusY, 0, 0, Math.PI * 2);
-                if (state.shapeFill) {
-                    ctx.fill();
-                } else {
-                    ctx.stroke();
+                    context.stroke();
                 }
                 break;
         }
-
-        // Apply hand-drawn effect if enabled
-        if (state.shapeRough && !isPreview) {
-            applyHandDrawnEffect(x1, y1, x2, y2, shape);
-        }
-        
-        ctx.globalAlpha = 1;
     }
 
     // Apply hand-drawn/sketch effect to shapes
-    function applyHandDrawnEffect(x1, y1, x2, y2, shape) {
-        const originalLineWidth = ctx.lineWidth;
-        ctx.lineWidth = Math.max(1, originalLineWidth * 0.8);
-        ctx.globalAlpha = 0.3;
+    function applyHandDrawnEffect(context, x1, y1, x2, y2, width, height, shape) {
+        const originalLineWidth = context.lineWidth;
+        context.lineWidth = Math.max(1, originalLineWidth * 0.8);
+        context.globalAlpha = 0.3;
         
-        const width = x2 - x1;
-        const height = y2 - y1;
         const jitter = 2; // Amount of randomness
         
-        ctx.beginPath();
-        
-        switch (shape) {
-            case 'rectangle':
-                // Draw slightly offset rectangles for hand-drawn effect
-                for (let i = 0; i < 2; i++) {
-                    const offsetX = (Math.random() - 0.5) * jitter;
-                    const offsetY = (Math.random() - 0.5) * jitter;
-                    ctx.strokeRect(x1 + offsetX, y1 + offsetY, width, height);
-                }
-                break;
-                
-            case 'circle':
-            case 'ellipse':
-                const radiusX = Math.abs(width) / 2;
-                const radiusY = Math.abs(height) / 2;
-                const centerX = x1 + width / 2;
-                const centerY = y1 + height / 2;
-                
-                // Draw slightly offset ellipses
-                for (let i = 0; i < 2; i++) {
-                    const offsetX = (Math.random() - 0.5) * jitter;
-                    const offsetY = (Math.random() - 0.5) * jitter;
-                    ctx.beginPath();
-                    ctx.ellipse(centerX + offsetX, centerY + offsetY, radiusX, radiusY, 0, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                break;
-                
-            case 'line':
-                // Draw slightly wavy lines
-                for (let i = 0; i < 2; i++) {
-                    const offsetX1 = (Math.random() - 0.5) * jitter;
-                    const offsetY1 = (Math.random() - 0.5) * jitter;
-                    const offsetX2 = (Math.random() - 0.5) * jitter;
-                    const offsetY2 = (Math.random() - 0.5) * jitter;
-                    ctx.beginPath();
-                    ctx.moveTo(x1 + offsetX1, y1 + offsetY1);
-                    ctx.lineTo(x2 + offsetX2, y2 + offsetY2);
-                    ctx.stroke();
-                }
-                break;
+        // Draw 2 slightly offset versions for hand-drawn effect
+        for (let i = 0; i < 2; i++) {
+            const offsetX = (Math.random() - 0.5) * jitter;
+            const offsetY = (Math.random() - 0.5) * jitter;
+            
+            context.beginPath();
+            
+            switch (shape) {
+                case 'rectangle':
+                    context.strokeRect(x1 + offsetX, y1 + offsetY, width, height);
+                    break;
+                    
+                case 'circle':
+                case 'ellipse':
+                    const radiusX = Math.abs(width) / 2;
+                    const radiusY = Math.abs(height) / 2;
+                    const centerX = x1 + width / 2;
+                    const centerY = y1 + height / 2;
+                    context.ellipse(centerX + offsetX, centerY + offsetY, radiusX, radiusY, 0, 0, Math.PI * 2);
+                    context.stroke();
+                    break;
+                    
+                case 'line':
+                case 'arrow':
+                    context.moveTo(x1 + offsetX, y1 + offsetY);
+                    context.lineTo(x2 + offsetX, y2 + offsetY);
+                    context.stroke();
+                    break;
+                    
+                case 'triangle':
+                    const topX = x1 + width / 2;
+                    const topY = y1;
+                    const leftX = x1;
+                    const leftY = y2;
+                    const rightX = x2;
+                    const rightY = y2;
+                    
+                    context.moveTo(topX + offsetX, topY + offsetY);
+                    context.lineTo(leftX + offsetX, leftY + offsetY);
+                    context.lineTo(rightX + offsetX, rightY + offsetY);
+                    context.closePath();
+                    context.stroke();
+                    break;
+                    
+                case 'diamond':
+                    const diamondCenterX = x1 + width / 2;
+                    const diamondCenterY = y1 + height / 2;
+                    
+                    context.moveTo(diamondCenterX + offsetX, y1 + offsetY);
+                    context.lineTo(x2 + offsetX, diamondCenterY + offsetY);
+                    context.lineTo(diamondCenterX + offsetX, y2 + offsetY);
+                    context.lineTo(x1 + offsetX, diamondCenterY + offsetY);
+                    context.closePath();
+                    context.stroke();
+                    break;
+                    
+                case 'star':
+                    const centerStarX = x1 + width / 2;
+                    const centerStarY = y1 + height / 2;
+                    const outerRadius = Math.min(Math.abs(width), Math.abs(height)) / 2;
+                    const innerRadius = outerRadius / 2;
+                    const spikes = 5;
+                    
+                    for (let j = 0; j < spikes * 2; j++) {
+                        const radius = j % 2 === 0 ? outerRadius : innerRadius;
+                        const angleRad = (j * Math.PI) / spikes - Math.PI / 2;
+                        const px = centerStarX + radius * Math.cos(angleRad) + offsetX;
+                        const py = centerStarY + radius * Math.sin(angleRad) + offsetY;
+                        
+                        if (j === 0) {
+                            context.moveTo(px, py);
+                        } else {
+                            context.lineTo(px, py);
+                        }
+                    }
+                    context.closePath();
+                    context.stroke();
+                    break;
+            }
         }
         
-        ctx.lineWidth = originalLineWidth;
-        ctx.globalAlpha = 1;
+        context.lineWidth = originalLineWidth;
+        context.globalAlpha = 1;
     }
 
     // Ruler state
