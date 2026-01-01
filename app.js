@@ -1419,6 +1419,16 @@
     // Service Worker registration and PWA install
     let deferredInstallPrompt = null;
     
+    // iOS detection helper
+    function isIOSDevice() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    }
+    
+    function isStandaloneMode() {
+        return window.matchMedia('(display-mode: standalone)').matches 
+            || window.navigator.standalone === true;
+    }
+    
     function registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js')
@@ -1460,10 +1470,9 @@
     }
     
     function setupInstallPrompt() {
-        // Detect iOS
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-            || window.navigator.standalone === true;
+        // Detect iOS and standalone mode
+        const isIOS = isIOSDevice();
+        const isStandalone = isStandaloneMode();
         
         if (isIOS && !isStandalone) {
             // Show install button for iOS (will open help modal)
@@ -1495,7 +1504,7 @@
     
     function handleInstallClick() {
         // Detect iOS
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isIOS = isIOSDevice();
         
         if (isIOS) {
             // Show iOS install instructions

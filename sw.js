@@ -98,11 +98,11 @@ self.addEventListener('fetch', event => {
                         const responseToCache = response.clone();
                         
                         // Cache new responses for static assets
-                        if (event.request.url.includes('icon-') || 
+                        if (event.request.url.includes('/icons/') || 
+                            event.request.url.includes('favicon.png') ||
                             event.request.url.endsWith('.css') ||
                             event.request.url.endsWith('.js') ||
-                            event.request.url.endsWith('.webmanifest') ||
-                            event.request.url.endsWith('.png')) {
+                            event.request.url.endsWith('.webmanifest')) {
                             caches.open(CACHE_NAME)
                                 .then(cache => {
                                     cache.put(event.request, responseToCache);
