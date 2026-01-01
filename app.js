@@ -29,7 +29,16 @@
         objects: [], // Array of drawable objects (shapes, text)
         textX: 0,
         textY: 0,
-        currentPointerId: null
+        currentPointerId: null,
+        // Zoom and pan state
+        scale: 1,
+        panX: 0,
+        panY: 0,
+        isPanning: false,
+        panStartX: 0,
+        panStartY: 0,
+        minScale: 0.1,
+        maxScale: 10
     };
 
     // DOM elements
@@ -45,6 +54,8 @@
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
     let toolStatus;
+    // Zoom elements
+    let zoomInBtn, zoomOutBtn, zoomResetBtn, zoomLevel;
     // PWA install elements
     let installBtn, iosInstallModal, closeIosInstall;
     // Text and select tool elements
@@ -101,6 +112,12 @@
         rulerScaleSlider = document.getElementById('ruler-scale');
         rulerScaleValue = document.getElementById('ruler-scale-value');
         rulerResetBtn = document.getElementById('ruler-reset');
+        
+        // Zoom elements
+        zoomInBtn = document.getElementById('zoom-in-btn');
+        zoomOutBtn = document.getElementById('zoom-out-btn');
+        zoomResetBtn = document.getElementById('zoom-reset-btn');
+        zoomLevel = document.getElementById('zoom-level');
         
         // PWA install elements
         installBtn = document.getElementById('install-btn');
@@ -296,6 +313,11 @@
         });
         rulerResetBtn.addEventListener('click', resetRulerPositions);
         
+        // Zoom controls
+        zoomInBtn.addEventListener('click', zoomIn);
+        zoomOutBtn.addEventListener('click', zoomOut);
+        zoomResetBtn.addEventListener('click', resetZoom);
+        
         // PWA install
         installBtn.addEventListener('click', handleInstallClick);
         closeIosInstall.addEventListener('click', closeIosInstallModal);
@@ -316,6 +338,12 @@
 
         // Prevent context menu on long press
         canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Zoom with mouse wheel
+        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        
+        // Keyboard shortcuts for zoom
+        document.addEventListener('keydown', handleKeyboard);
     }
 
     // Color selection
@@ -512,6 +540,27 @@
         // This gives a consistent baseline (0.5 for mouse, varies for touch)
         return e.pressure;
     }
+    
+    // Coordinate transformation helpers for zoom and pan
+    function screenToCanvas(screenX, screenY) {
+        // Convert screen coordinates to canvas coordinates accounting for zoom and pan
+        return {
+            x: (screenX - state.panX) / state.scale,
+            y: (screenY - state.panY) / state.scale
+        };
+    }
+    
+    function applyTransform(context) {
+        // Apply zoom and pan transformation to context
+        const dpr = window.devicePixelRatio || 1;
+        context.setTransform(dpr * state.scale, 0, 0, dpr * state.scale, dpr * state.panX, dpr * state.panY);
+    }
+    
+    function resetTransform(context) {
+        // Reset to default transform (DPR only)
+        const dpr = window.devicePixelRatio || 1;
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
 
     // Drawing functions
     function startDrawing(e) {
@@ -532,8 +581,13 @@
         }
         
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        
+        // Convert to canvas coordinates with zoom
+        const coords = screenToCanvas(screenX, screenY);
+        const x = coords.x;
+        const y = coords.y;
         
         console.log('pointerdown:', {
             activeTool: state.activeTool,
@@ -541,7 +595,7 @@
             pointerType: e.pointerType,
             pointerId: e.pointerId,
             normalizedPressure: normalizePressure(e),
-            x, y
+            screenX, screenY, x, y, scale: state.scale
         });
 
         // Handle text tool
@@ -600,13 +654,20 @@
         }
         
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        
+        // Convert to canvas coordinates with zoom
+        const coords = screenToCanvas(screenX, screenY);
+        const x = coords.x;
+        const y = coords.y;
         
         // Handle shape preview
         if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
-            // Clear overlay
+            // Clear overlay (need to reset transform first)
+            resetTransform(overlayCtx);
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            applyTransform(overlayCtx);
             
             // Draw shape preview on overlay
             drawShapePreview(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
@@ -669,13 +730,20 @@
         });
         
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        
+        // Convert to canvas coordinates with zoom
+        const coords = screenToCanvas(screenX, screenY);
+        const x = coords.x;
+        const y = coords.y;
         
         // Handle shape finalization
         if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
-            // Clear overlay
+            // Clear overlay (need to reset transform first)
+            resetTransform(overlayCtx);
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            applyTransform(overlayCtx);
             
             // Draw final shape to main canvas
             drawShapeFinal(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
@@ -706,6 +774,7 @@
 
     // Brush texture implementations
     function drawInk(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size;
@@ -719,9 +788,11 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
+        resetTransform(ctx);
     }
 
     function drawPencil(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size * 0.7;
@@ -734,9 +805,11 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
+        resetTransform(ctx);
     }
 
     function drawMarker(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size * 1.5;
@@ -749,9 +822,11 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
+        resetTransform(ctx);
     }
 
     function drawSpray(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = state.currentColor;
         ctx.globalAlpha = 0.1;
@@ -774,9 +849,11 @@
                 ctx.fill();
             }
         }
+        resetTransform(ctx);
     }
 
     function drawCharcoal(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.globalAlpha = 0.4;
@@ -793,9 +870,11 @@
             ctx.lineTo(x2 + offsetX, y2 + offsetY);
             ctx.stroke();
         }
+        resetTransform(ctx);
     }
 
     function drawEraser(x1, y1, x2, y2, size) {
+        applyTransform(ctx);
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = size * 2;
         ctx.globalAlpha = 1;
@@ -809,6 +888,7 @@
         ctx.stroke();
         
         ctx.globalCompositeOperation = 'source-over';
+        resetTransform(ctx);
     }
 
     // History management
@@ -844,8 +924,13 @@
     function restoreHistoryState(dataUrl) {
         const img = new Image();
         img.onload = function() {
+            // Clear canvas
+            resetTransform(ctx);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Draw image with zoom transformation
+            applyTransform(ctx);
             ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+            resetTransform(ctx);
         };
         img.src = dataUrl;
     }
@@ -912,6 +997,98 @@
         state.paperMode = paperBgCheckbox.checked;
         canvasContainer.classList.toggle('paper-mode', state.paperMode);
         localStorage.setItem('lifepad-paper-mode', state.paperMode);
+    }
+    
+    // Zoom and pan functions
+    function zoomIn() {
+        const rect = canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        zoom(1.2, centerX, centerY);
+    }
+    
+    function zoomOut() {
+        const rect = canvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        zoom(1 / 1.2, centerX, centerY);
+    }
+    
+    function resetZoom() {
+        state.scale = 1;
+        state.panX = 0;
+        state.panY = 0;
+        updateZoomDisplay();
+        redrawCanvas();
+        showToast('Zoom reset to 100%');
+    }
+    
+    function zoom(factor, centerX, centerY) {
+        const oldScale = state.scale;
+        state.scale = Math.max(state.minScale, Math.min(state.maxScale, state.scale * factor));
+        
+        // Adjust pan to zoom towards the center point
+        const scaleChange = state.scale / oldScale;
+        state.panX = centerX - (centerX - state.panX) * scaleChange;
+        state.panY = centerY - (centerY - state.panY) * scaleChange;
+        
+        updateZoomDisplay();
+        redrawCanvas();
+    }
+    
+    function updateZoomDisplay() {
+        if (zoomLevel) {
+            zoomLevel.textContent = Math.round(state.scale * 100) + '%';
+        }
+    }
+    
+    function handleWheel(e) {
+        e.preventDefault();
+        
+        // Determine zoom direction
+        const delta = e.deltaY;
+        const zoomFactor = delta > 0 ? 1 / 1.1 : 1.1;
+        
+        // Get mouse position relative to canvas
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        zoom(zoomFactor, x, y);
+    }
+    
+    function handleKeyboard(e) {
+        // Zoom in: Ctrl/Cmd + Plus or Ctrl/Cmd + =
+        if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) {
+            e.preventDefault();
+            zoomIn();
+        }
+        // Zoom out: Ctrl/Cmd + Minus
+        else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+            e.preventDefault();
+            zoomOut();
+        }
+        // Reset zoom: Ctrl/Cmd + 0
+        else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+            e.preventDefault();
+            resetZoom();
+        }
+        // Pan with space + arrow keys
+        else if (e.key === ' ' && e.shiftKey) {
+            e.preventDefault();
+            state.isPanning = true;
+        }
+    }
+    
+    function redrawCanvas() {
+        // This will trigger on the next animation frame
+        requestAnimationFrame(() => {
+            // The transform is applied in the drawing context
+            // We need to redraw from history
+            if (state.history.length > 0 && state.historyStep >= 0) {
+                restoreHistoryState(state.history[state.historyStep]);
+            }
+        });
     }
 
     // State management

@@ -303,6 +303,24 @@ html, body {
     margin-left: auto;
 }
 
+.zoom-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--bg-primary);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+#zoom-level {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 45px;
+    text-align: center;
+}
+
 .tool-btn {
     padding: 8px 16px;
     border-radius: 6px;
