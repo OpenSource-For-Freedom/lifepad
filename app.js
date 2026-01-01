@@ -489,7 +489,12 @@
         }
         
         state.currentPointerId = e.pointerId;
-        canvas.setPointerCapture(e.pointerId);
+        try {
+            canvas.setPointerCapture(e.pointerId);
+        } catch (err) {
+            // Pointer capture may fail in some cases, that's okay
+            console.log('setPointerCapture failed:', err.message);
+        }
         
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
