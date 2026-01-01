@@ -881,6 +881,8 @@
 
     function selectShape(shape) {
         state.currentShape = shape;
+        state.currentTool = 'brush'; // Switch to brush tool to enable shape drawing
+        updateToolButtons(); // Update UI to reflect tool change
         shapeButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.shape === shape);
         });
