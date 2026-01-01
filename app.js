@@ -271,10 +271,24 @@
         hostTabBtn.addEventListener('click', () => switchTab('host'));
         joinTabBtn.addEventListener('click', () => switchTab('join'));
         createOfferBtn.addEventListener('click', handleCreateOffer);
-        copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
+        copyOfferBtn.addEventListener('click', async () => {
+            try {
+                await copyToClipboard(offerBlob.value);
+                showToast('Copied to clipboard!');
+            } catch (error) {
+                showToast('Failed to copy - please select and copy manually');
+            }
+        });
         applyAnswerBtn.addEventListener('click', handleApplyAnswer);
         createAnswerBtn.addEventListener('click', handleCreateAnswer);
-        copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
+        copyAnswerBtn.addEventListener('click', async () => {
+            try {
+                await copyToClipboard(answerBlob.value);
+                showToast('Copied to clipboard!');
+            } catch (error) {
+                showToast('Failed to copy - please select and copy manually');
+            }
+        });
         disconnectBtn.addEventListener('click', handleDisconnect);
 
         // Tools dropdown
@@ -2118,25 +2132,21 @@
     }
     
     async function copyToClipboard(text) {
-        try {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                await navigator.clipboard.writeText(text);
-                // Caller handles context-specific toast messages
-            } else {
-                // Fallback for older browsers
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                // Caller handles context-specific toast messages
-            }
-        } catch (error) {
-            showToast('Failed to copy - please select and copy manually');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
         }
+        // Throws if clipboard operation fails
+        // Caller handles success/error messages
     }
 
     // ============================================
