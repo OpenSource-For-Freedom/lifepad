@@ -41,7 +41,9 @@
     let toast;
     let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
-    let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler;
+    let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
+    let selectToolBtn, textToolBtn, textDialog, textInput, textConfirmBtn, textCancelBtn;
+    let collabBtn;
     // Collaboration elements
     let collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
@@ -88,9 +90,20 @@
         closeRulerBtn = document.getElementById('close-ruler');
         horizontalRuler = document.getElementById('horizontal-ruler');
         verticalRuler = document.getElementById('vertical-ruler');
+        rulerScaleSlider = document.getElementById('ruler-scale');
+        rulerScaleValue = document.getElementById('ruler-scale-value');
+        rulerResetBtn = document.getElementById('ruler-reset');
+        selectToolBtn = document.getElementById('select-tool');
+        textToolBtn = document.getElementById('text-tool');
+        textDialog = document.getElementById('text-dialog');
+        textInput = document.getElementById('text-input');
+        textConfirmBtn = document.getElementById('text-confirm');
+        textCancelBtn = document.getElementById('text-cancel');
+        collabBtn = document.getElementById('collab-btn');
         
         // Collaboration elements
         collabModal = document.getElementById('collab-modal');
+        closeCollabModal = document.getElementById('close-collab-modal');
         collabStatus = document.getElementById('collab-status');
         collabError = document.getElementById('collab-error');
         hostTab = document.getElementById('host-tab');
@@ -211,6 +224,7 @@
         paperBgCheckbox.addEventListener('change', togglePaperMode);
         
         // Collaboration
+        collabBtn.addEventListener('click', openCollabModal);
         // TODO: Add collaboration trigger button to HTML - currently no UI element exists to open the modal
         // The collaboration modal and its functionality are implemented but lack a trigger button
         closeCollabModal.addEventListener('click', closeCollabModalFn);
