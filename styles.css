@@ -954,6 +954,8 @@ html, body {
     background: rgba(100, 100, 100, 0.8);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     pointer-events: auto;
+    cursor: move;
+    user-select: none;
 }
 
 .horizontal-ruler {
@@ -1064,6 +1066,95 @@ html, body {
     writing-mode: vertical-rl;
 }
 
+/* Ruler resize handles */
+.resize-handle {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    z-index: 10;
+    transition: background 0.2s ease;
+}
+
+.resize-handle:hover {
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.resize-handle-h {
+    right: 0;
+    top: 0;
+    width: 20px;
+    height: 100%;
+    cursor: ew-resize;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.resize-handle-v {
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 20px;
+    cursor: ns-resize;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+/* Ruler controls */
+.ruler-controls {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-secondary);
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    pointer-events: auto;
+    z-index: 45;
+}
+
+.ruler-control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ruler-control-group label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.ruler-control-group input[type="range"] {
+    width: 150px;
+}
+
+.ruler-control-group span {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--accent);
+    min-width: 40px;
+}
+
+.ruler-controls .secondary-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ruler-controls .secondary-btn:hover {
+    background: var(--accent-hover);
+}
+
 /* Mobile adjustments for new features */
 @media (max-width: 768px) {
     .shapes-panel {
@@ -1080,5 +1171,16 @@ html, body {
     .vertical-ruler {
         height: 90%;
         max-height: 400px;
+    }
+    
+    .ruler-controls {
+        flex-direction: column;
+        gap: 10px;
+        bottom: 70px;
+        padding: 12px 15px;
+    }
+    
+    .ruler-control-group input[type="range"] {
+        width: 120px;
     }
 }
