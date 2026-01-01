@@ -1,7 +1,7 @@
 {
   "name": "lifePAD",
   "short_name": "lifePAD",
-  "description": "Primary Artistry Device - A simple sketch pad for touch and stylus",
+  "description": "Primary Artistry Device - Excalidraw alternative with hand-drawn diagrams, shapes, and artistic brushes",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#2a2d3a",

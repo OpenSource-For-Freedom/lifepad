@@ -6,22 +6,35 @@ https://opensource-for-freedom.github.io/lifepad/
 
 ## What is lifePAD?
 
-lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing experience. It works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, note-taking, or artistic expression on the go.
+lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing and diagramming experience. Designed to compete with tools like Excalidraw, it works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, diagrams, note-taking, brainstorming, or artistic expression on the go.
 
 ## Features
 
+### Drawing & Diagramming Tools
+- **Multiple brush textures**: Ink, Pencil, Marker, Spray, and Charcoal
+- **Rich shape library**: Rectangle, Circle, Line, Triangle, Arrow, Star, Diamond, Ellipse
+- **Hand-drawn style**: Optional rough/sketch aesthetic for shapes (Excalidraw-like)
+- **Text tool**: Add labels and annotations to your drawings
+- **Selection tool**: Select and manipulate objects (coming soon: move, resize, rotate)
 - Touch and stylus optimized with pressure sensitivity support
-- Multiple brush textures: Ink, Pencil, Marker, Spray, and Charcoal
 - 8 preset colors plus custom color picker
 - Adjustable brush size (1-48 pixels)
-- Undo/Redo with history management
+- Fill shapes with solid colors
+- Ruler tool for measurements
+
+### Productivity Features
+- Undo/Redo with history management (30 steps)
 - Eraser tool
 - Canvas autosave to localStorage
-- Save drawings as PNG images
+- **Export formats**: PNG and SVG
 - Light and Dark theme modes
 - Optional paper background (warm off-white)
+
+### Collaboration & Privacy
 - Real-time peer-to-peer collaboration with end-to-end encryption
 - Works completely offline (solo mode)
+- No accounts required
+- No data sent to external servers
 - No external dependencies or CDN usage
 
 ## How to Run Locally
@@ -198,6 +211,25 @@ The status indicator in the navbar shows your current connection state:
 3. Click it and confirm the installation
 4. The app will open in its own window
 5. Access it from your Start menu or Applications folder
+
+## Why Choose lifePAD?
+
+### Excalidraw Alternative
+lifePAD offers many of the features that make Excalidraw popular:
+- ✅ Hand-drawn/sketch aesthetic for diagrams
+- ✅ Rich shape library with customizable styles
+- ✅ Text annotations
+- ✅ Export to PNG and SVG
+- ✅ Real-time collaboration
+- ✅ Offline-first PWA
+- ✅ No accounts required
+- ✅ Privacy-focused with encryption
+- ✅ Open source and free
+
+**Plus unique features:**
+- 🎨 Natural brush textures (Pencil, Marker, Spray, Charcoal) for artistic expression
+- 🖌️ Pressure-sensitive stylus support for tablets
+- 🎨 Built-in dark mode
 
 ## Privacy and Data
 
