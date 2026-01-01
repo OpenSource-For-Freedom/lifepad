@@ -216,17 +216,17 @@
         themeToggleBtn.addEventListener('click', toggleTheme);
         paperBgCheckbox.addEventListener('change', togglePaperMode);
         
-        // Collaboration
-        collabBtn.addEventListener('click', openCollabModal);
-        closeCollabModal.addEventListener('click', closeCollabModalFn);
-        hostTabBtn.addEventListener('click', () => switchTab('host'));
-        joinTabBtn.addEventListener('click', () => switchTab('join'));
-        createOfferBtn.addEventListener('click', handleCreateOffer);
-        copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
-        applyAnswerBtn.addEventListener('click', handleApplyAnswer);
-        createAnswerBtn.addEventListener('click', handleCreateAnswer);
-        copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
-        disconnectBtn.addEventListener('click', handleDisconnect);
+        // Collaboration (only if elements exist)
+        if (collabBtn) collabBtn.addEventListener('click', openCollabModal);
+        if (closeCollabModal) closeCollabModal.addEventListener('click', closeCollabModalFn);
+        if (hostTabBtn) hostTabBtn.addEventListener('click', () => switchTab('host'));
+        if (joinTabBtn) joinTabBtn.addEventListener('click', () => switchTab('join'));
+        if (createOfferBtn) createOfferBtn.addEventListener('click', handleCreateOffer);
+        if (copyOfferBtn) copyOfferBtn.addEventListener('click', () => copyToClipboard(offerBlob.value));
+        if (applyAnswerBtn) applyAnswerBtn.addEventListener('click', handleApplyAnswer);
+        if (createAnswerBtn) createAnswerBtn.addEventListener('click', handleCreateAnswer);
+        if (copyAnswerBtn) copyAnswerBtn.addEventListener('click', () => copyToClipboard(answerBlob.value));
+        if (disconnectBtn) disconnectBtn.addEventListener('click', handleDisconnect);
 
         // Tools dropdown
         toolsBtn.addEventListener('click', toggleToolsMenu);
@@ -258,6 +258,12 @@
 
         // Ruler
         closeRulerBtn.addEventListener('click', closeRuler);
+        rulerScaleSlider.addEventListener('input', function() {
+            rulerState.pixelsPerMeter = parseInt(this.value);
+            rulerScaleValue.textContent = this.value;
+            updateRulerMeasurements();
+        });
+        rulerResetBtn.addEventListener('click', resetRulerPositions);
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
@@ -1081,59 +1087,308 @@
         ctx.globalAlpha = 1;
     }
 
+    // Ruler state
+    const rulerState = {
+        pixelsPerMeter: 100, // Scale: 100 pixels = 1 meter
+        horizontalWidth: 600,
+        verticalHeight: 600,
+        isDraggingH: false,
+        isDraggingV: false,
+        isResizingH: false,
+        isResizingV: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        rulerStartX: 0,
+        rulerStartY: 0,
+        resizeStartWidth: 0,
+        resizeStartHeight: 0
+    };
+
     // Ruler
     function openRuler() {
         rulerOverlay.classList.remove('hidden');
         toolsMenu.classList.remove('show');
         initializeRulers();
-        showToast('Use rulers to measure distances');
+        setupRulerControls();
+        showToast('Drag rulers to move, drag edges to resize. Units: meters (horizontal) and milliradians (vertical)');
     }
 
     function closeRuler() {
         rulerOverlay.classList.add('hidden');
+        removeRulerControls();
+    }
+
+    function resetRulerPositions() {
+        // Reset horizontal ruler position
+        horizontalRuler.style.top = '20px';
+        horizontalRuler.style.left = '50%';
+        horizontalRuler.style.transform = 'translateX(-50%)';
+        horizontalRuler.style.width = '600px';
+        rulerState.horizontalWidth = 600;
+        
+        // Reset vertical ruler position
+        verticalRuler.style.top = '50%';
+        verticalRuler.style.left = '20px';
+        verticalRuler.style.transform = 'translateY(-50%)';
+        verticalRuler.style.height = '600px';
+        rulerState.verticalHeight = 600;
+        
+        // Update measurements
+        updateRulerMeasurements();
+        showToast('Ruler positions reset');
+    }
+
+    function setupRulerControls() {
+        // Add dragging for horizontal ruler
+        horizontalRuler.addEventListener('pointerdown', startDragHorizontal);
+        
+        // Add dragging for vertical ruler
+        verticalRuler.addEventListener('pointerdown', startDragVertical);
+        
+        // Add resize handles
+        addResizeHandles();
+    }
+
+    function removeRulerControls() {
+        horizontalRuler.removeEventListener('pointerdown', startDragHorizontal);
+        verticalRuler.removeEventListener('pointerdown', startDragVertical);
+    }
+
+    function addResizeHandles() {
+        // Add resize handle to horizontal ruler
+        if (!horizontalRuler.querySelector('.resize-handle')) {
+            const hHandle = document.createElement('div');
+            hHandle.className = 'resize-handle resize-handle-h';
+            hHandle.addEventListener('pointerdown', startResizeHorizontal);
+            horizontalRuler.appendChild(hHandle);
+        }
+
+        // Add resize handle to vertical ruler
+        if (!verticalRuler.querySelector('.resize-handle')) {
+            const vHandle = document.createElement('div');
+            vHandle.className = 'resize-handle resize-handle-v';
+            vHandle.addEventListener('pointerdown', startResizeVertical);
+            verticalRuler.appendChild(vHandle);
+        }
+    }
+
+    function startDragHorizontal(e) {
+        if (e.target.classList.contains('resize-handle')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        
+        rulerState.isDraggingH = true;
+        rulerState.dragStartX = e.clientX;
+        rulerState.dragStartY = e.clientY;
+        
+        const rect = horizontalRuler.getBoundingClientRect();
+        const containerRect = canvasContainer.getBoundingClientRect();
+        rulerState.rulerStartX = rect.left - containerRect.left;
+        rulerState.rulerStartY = rect.top - containerRect.top;
+        
+        document.addEventListener('pointermove', dragHorizontalRuler);
+        document.addEventListener('pointerup', stopDragHorizontal);
+    }
+
+    function dragHorizontalRuler(e) {
+        if (!rulerState.isDraggingH) return;
+        
+        const deltaX = e.clientX - rulerState.dragStartX;
+        const deltaY = e.clientY - rulerState.dragStartY;
+        
+        const newX = rulerState.rulerStartX + deltaX;
+        const newY = rulerState.rulerStartY + deltaY;
+        
+        horizontalRuler.style.left = newX + 'px';
+        horizontalRuler.style.top = newY + 'px';
+        horizontalRuler.style.transform = 'none';
+    }
+
+    function stopDragHorizontal() {
+        rulerState.isDraggingH = false;
+        document.removeEventListener('pointermove', dragHorizontalRuler);
+        document.removeEventListener('pointerup', stopDragHorizontal);
+    }
+
+    function startDragVertical(e) {
+        if (e.target.classList.contains('resize-handle')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        
+        rulerState.isDraggingV = true;
+        rulerState.dragStartX = e.clientX;
+        rulerState.dragStartY = e.clientY;
+        
+        const rect = verticalRuler.getBoundingClientRect();
+        const containerRect = canvasContainer.getBoundingClientRect();
+        rulerState.rulerStartX = rect.left - containerRect.left;
+        rulerState.rulerStartY = rect.top - containerRect.top;
+        
+        document.addEventListener('pointermove', dragVerticalRuler);
+        document.addEventListener('pointerup', stopDragVertical);
+    }
+
+    function dragVerticalRuler(e) {
+        if (!rulerState.isDraggingV) return;
+        
+        const deltaX = e.clientX - rulerState.dragStartX;
+        const deltaY = e.clientY - rulerState.dragStartY;
+        
+        const newX = rulerState.rulerStartX + deltaX;
+        const newY = rulerState.rulerStartY + deltaY;
+        
+        verticalRuler.style.left = newX + 'px';
+        verticalRuler.style.top = newY + 'px';
+        verticalRuler.style.transform = 'none';
+    }
+
+    function stopDragVertical() {
+        rulerState.isDraggingV = false;
+        document.removeEventListener('pointermove', dragVerticalRuler);
+        document.removeEventListener('pointerup', stopDragVertical);
+    }
+
+    function startResizeHorizontal(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        rulerState.isResizingH = true;
+        rulerState.dragStartX = e.clientX;
+        rulerState.resizeStartWidth = rulerState.horizontalWidth;
+        
+        document.addEventListener('pointermove', resizeHorizontalRuler);
+        document.addEventListener('pointerup', stopResizeHorizontal);
+    }
+
+    function resizeHorizontalRuler(e) {
+        if (!rulerState.isResizingH) return;
+        
+        const deltaX = e.clientX - rulerState.dragStartX;
+        const newWidth = Math.max(200, rulerState.resizeStartWidth + deltaX);
+        
+        rulerState.horizontalWidth = newWidth;
+        horizontalRuler.style.width = newWidth + 'px';
+        
+        updateRulerMeasurements();
+    }
+
+    function stopResizeHorizontal() {
+        rulerState.isResizingH = false;
+        document.removeEventListener('pointermove', resizeHorizontalRuler);
+        document.removeEventListener('pointerup', stopResizeHorizontal);
+    }
+
+    function startResizeVertical(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        rulerState.isResizingV = true;
+        rulerState.dragStartY = e.clientY;
+        rulerState.resizeStartHeight = rulerState.verticalHeight;
+        
+        document.addEventListener('pointermove', resizeVerticalRuler);
+        document.addEventListener('pointerup', stopResizeVertical);
+    }
+
+    function resizeVerticalRuler(e) {
+        if (!rulerState.isResizingV) return;
+        
+        const deltaY = e.clientY - rulerState.dragStartY;
+        const newHeight = Math.max(200, rulerState.resizeStartHeight + deltaY);
+        
+        rulerState.verticalHeight = newHeight;
+        verticalRuler.style.height = newHeight + 'px';
+        
+        updateRulerMeasurements();
+    }
+
+    function stopResizeVertical() {
+        rulerState.isResizingV = false;
+        document.removeEventListener('pointermove', resizeVerticalRuler);
+        document.removeEventListener('pointerup', stopResizeVertical);
     }
 
     function initializeRulers() {
-        // Create measurements for horizontal ruler
+        updateRulerMeasurements();
+    }
+
+    function updateRulerMeasurements() {
+        // Create measurements for horizontal ruler (in meters)
         const hMeasurements = horizontalRuler.querySelector('.ruler-measurements');
         hMeasurements.innerHTML = '';
         
-        const hWidth = 600;
-        const hInterval = 50; // pixels between marks
+        const hWidth = rulerState.horizontalWidth;
+        const metersPerPixel = 1 / rulerState.pixelsPerMeter;
+        const totalMeters = hWidth * metersPerPixel;
         
-        for (let i = 0; i <= hWidth; i += hInterval) {
-            const mark = document.createElement('div');
-            mark.className = i % 100 === 0 ? 'ruler-mark major' : 'ruler-mark minor';
-            mark.style.left = i + 'px';
+        // Determine appropriate interval based on total length
+        let meterInterval;
+        if (totalMeters < 2) {
+            meterInterval = 0.1; // 10cm intervals for short rulers
+        } else if (totalMeters < 10) {
+            meterInterval = 0.5; // 50cm intervals
+        } else {
+            meterInterval = 1; // 1m intervals for long rulers
+        }
+        
+        const pixelInterval = meterInterval * rulerState.pixelsPerMeter;
+        
+        for (let meters = 0; meters <= totalMeters; meters += meterInterval) {
+            const pixelPos = meters * rulerState.pixelsPerMeter;
+            if (pixelPos > hWidth) break;
             
-            if (i % 100 === 0) {
+            const mark = document.createElement('div');
+            const isMajor = Math.abs(meters % 1) < 0.01; // Major marks at whole meters
+            mark.className = isMajor ? 'ruler-mark major' : 'ruler-mark minor';
+            mark.style.left = pixelPos + 'px';
+            
+            if (isMajor) {
                 const label = document.createElement('span');
                 label.className = 'ruler-label';
-                label.textContent = i;
-                label.style.left = (i + 5) + 'px';
+                label.textContent = meters.toFixed(1) + 'm';
+                label.style.left = (pixelPos + 5) + 'px';
                 hMeasurements.appendChild(label);
             }
             
             hMeasurements.appendChild(mark);
         }
         
-        // Create measurements for vertical ruler
+        // Create measurements for vertical ruler (in milliradians)
         const vMeasurements = verticalRuler.querySelector('.ruler-measurements');
         vMeasurements.innerHTML = '';
         
-        const vHeight = 600;
-        const vInterval = 50;
+        const vHeight = rulerState.verticalHeight;
+        // Milliradians: assume reference distance is such that pixels map to mrad
+        // For simplicity: 10 pixels = 1 milliradian
+        const pixelsPerMrad = 10;
+        const totalMrad = vHeight / pixelsPerMrad;
         
-        for (let i = 0; i <= vHeight; i += vInterval) {
-            const mark = document.createElement('div');
-            mark.className = i % 100 === 0 ? 'ruler-mark major' : 'ruler-mark minor';
-            mark.style.top = i + 'px';
+        // Determine appropriate interval based on total length
+        let mradInterval;
+        if (totalMrad < 20) {
+            mradInterval = 1; // 1 mrad intervals
+        } else if (totalMrad < 100) {
+            mradInterval = 5; // 5 mrad intervals
+        } else {
+            mradInterval = 10; // 10 mrad intervals
+        }
+        
+        const mradPixelInterval = mradInterval * pixelsPerMrad;
+        
+        for (let mrad = 0; mrad <= totalMrad; mrad += mradInterval) {
+            const pixelPos = mrad * pixelsPerMrad;
+            if (pixelPos > vHeight) break;
             
-            if (i % 100 === 0) {
+            const mark = document.createElement('div');
+            const isMajor = mrad % (mradInterval * 2) === 0;
+            mark.className = isMajor ? 'ruler-mark major' : 'ruler-mark minor';
+            mark.style.top = pixelPos + 'px';
+            
+            if (isMajor || mrad === 0) {
                 const label = document.createElement('span');
                 label.className = 'ruler-label';
-                label.textContent = i;
-                label.style.top = (i + 5) + 'px';
+                label.textContent = mrad.toFixed(0) + 'mrad';
+                label.style.top = (pixelPos + 5) + 'px';
                 vMeasurements.appendChild(label);
             }
             
