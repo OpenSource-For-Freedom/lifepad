@@ -1932,18 +1932,23 @@
             
             clearCollabError();
             createOfferBtn.disabled = true;
-            createOfferBtn.textContent = 'Creating offer...';
+            createOfferBtn.textContent = 'Creating...';
             updateCollabStatus('Creating offer');
             
             const offerBlobObj = await RTC.createOffer(passphrase);
             
-            offerBlob.value = JSON.stringify(offerBlobObj, null, 2);
+            const offerText = JSON.stringify(offerBlobObj, null, 2);
+            offerBlob.value = offerText;
             offerOutput.classList.remove('hidden');
             answerInput.classList.remove('hidden');
             disconnectBtn.classList.remove('hidden');
             
+            // Auto-copy to clipboard
+            await copyToClipboard(offerText);
+            
             updateCollabStatus('Waiting for answer');
-            createOfferBtn.textContent = 'Offer Created';
+            createOfferBtn.textContent = 'Offer Created (Copied!)';
+            showToast('Offer copied to clipboard! Send it to your partner.');
             
         } catch (error) {
             console.error('Create offer error:', error);
@@ -1959,7 +1964,7 @@
             const answerText = answerBlobInput.value.trim();
             
             if (!answerText) {
-                showCollabError('Please paste the answer blob');
+                showCollabError('Please paste the response data');
                 return;
             }
             
@@ -1967,30 +1972,30 @@
             try {
                 answerBlobObj = JSON.parse(answerText);
             } catch (e) {
-                showCollabError('Invalid answer blob format');
+                showCollabError('Invalid response data format');
                 return;
             }
             
             if (answerBlobObj.app !== 'lifePAD' || answerBlobObj.v !== 1 || answerBlobObj.type !== 'answer') {
-                showCollabError('Invalid answer blob - wrong app or version');
+                showCollabError('Invalid response data - please check and try again');
                 return;
             }
             
             clearCollabError();
             applyAnswerBtn.disabled = true;
-            applyAnswerBtn.textContent = 'Applying...';
+            applyAnswerBtn.textContent = 'Connecting...';
             updateCollabStatus('Connecting');
             
             await RTC.applyAnswer(answerBlobObj);
             
-            applyAnswerBtn.textContent = 'Answer Applied';
-            showToast('Waiting for connection to establish');
+            applyAnswerBtn.textContent = 'Connected!';
+            showToast('Connection established - start drawing!');
             
         } catch (error) {
             console.error('Apply answer error:', error);
             showCollabError('Failed to apply answer: ' + error.message);
             applyAnswerBtn.disabled = false;
-            applyAnswerBtn.textContent = 'Apply Answer';
+            applyAnswerBtn.textContent = 'Connect';
         }
     }
     
@@ -2010,7 +2015,7 @@
             }
             
             if (!offerText) {
-                showCollabError('Please paste the offer blob');
+                showCollabError('Please paste the connection data');
                 return;
             }
             
@@ -2018,29 +2023,33 @@
             try {
                 offerBlobObj = JSON.parse(offerText);
             } catch (e) {
-                showCollabError('Invalid offer blob format');
+                showCollabError('Invalid connection data format');
                 return;
             }
             
             if (offerBlobObj.app !== 'lifePAD' || offerBlobObj.v !== 1 || offerBlobObj.type !== 'offer') {
-                showCollabError('Invalid offer blob - wrong app or version');
+                showCollabError('Invalid connection data - please check and try again');
                 return;
             }
             
             clearCollabError();
             createAnswerBtn.disabled = true;
-            createAnswerBtn.textContent = 'Creating answer...';
+            createAnswerBtn.textContent = 'Creating...';
             updateCollabStatus('Ready to join');
             
             const answerBlobObj = await RTC.createAnswer(passphrase, offerBlobObj);
             
-            answerBlob.value = JSON.stringify(answerBlobObj, null, 2);
+            const answerText = JSON.stringify(answerBlobObj, null, 2);
+            answerBlob.value = answerText;
             answerOutput.classList.remove('hidden');
             disconnectBtn.classList.remove('hidden');
             
+            // Auto-copy to clipboard
+            await copyToClipboard(answerText);
+            
             updateCollabStatus('Connecting');
-            createAnswerBtn.textContent = 'Answer Created';
-            showToast('Send answer blob to host to complete connection');
+            createAnswerBtn.textContent = 'Answer Created (Copied!)';
+            showToast('Answer copied to clipboard! Send it to the host.');
             
         } catch (error) {
             console.error('Create answer error:', error);
@@ -2070,7 +2079,7 @@
         createOfferBtn.disabled = false;
         createOfferBtn.textContent = 'Create Offer';
         applyAnswerBtn.disabled = false;
-        applyAnswerBtn.textContent = 'Apply Answer';
+        applyAnswerBtn.textContent = 'Connect';
         createAnswerBtn.disabled = false;
         createAnswerBtn.textContent = 'Create Answer';
         
