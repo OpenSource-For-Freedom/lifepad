@@ -2132,24 +2132,28 @@
     }
     
     async function copyToClipboard(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(text);
-        } else {
-            // Fallback for older browsers
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            const success = document.execCommand('copy');
-            document.body.removeChild(textarea);
-            
-            if (!success) {
-                throw new Error('Copy command failed');
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return; // Success
             }
+        } catch (error) {
+            // Modern API failed, try fallback
         }
-        // Throws if clipboard operation fails
+        
+        // Fallback for older browsers or when modern API fails
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        
+        if (!success) {
+            throw new Error('Copy command failed');
+        }
         // Caller handles success/error messages
     }
 
