@@ -1040,8 +1040,6 @@
     }
 
     function drawShapeGeometry(context, x1, y1, x2, y2, width, height, shape, fill) {
-        context.beginPath();
-        
         switch (shape) {
             case 'rectangle':
                 if (fill) {
@@ -1053,6 +1051,7 @@
                 
             case 'circle':
             case 'ellipse':
+                context.beginPath();
                 const radiusX = Math.abs(width) / 2;
                 const radiusY = Math.abs(height) / 2;
                 const centerX = x1 + width / 2;
@@ -1067,6 +1066,7 @@
                 break;
                 
             case 'line':
+                context.beginPath();
                 context.moveTo(x1, y1);
                 context.lineTo(x2, y2);
                 context.stroke();
@@ -1077,6 +1077,7 @@
                 const headLength = Math.min(20, Math.abs(width) / 3, Math.abs(height) / 3);
                 
                 // Draw line
+                context.beginPath();
                 context.moveTo(x1, y1);
                 context.lineTo(x2, y2);
                 context.stroke();
@@ -1097,6 +1098,7 @@
                 break;
                 
             case 'triangle':
+                context.beginPath();
                 const topX = x1 + width / 2;
                 const topY = y1;
                 const leftX = x1;
@@ -1117,6 +1119,7 @@
                 break;
                 
             case 'star':
+                context.beginPath();
                 const centerStarX = x1 + width / 2;
                 const centerStarY = y1 + height / 2;
                 const outerRadius = Math.min(Math.abs(width), Math.abs(height)) / 2;
@@ -1145,6 +1148,7 @@
                 break;
 
             case 'diamond':
+                context.beginPath();
                 const diamondCenterX = x1 + width / 2;
                 const diamondCenterY = y1 + height / 2;
                 
