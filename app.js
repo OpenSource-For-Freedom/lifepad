@@ -346,15 +346,13 @@
             });
         });
 
-        customColorPicker.addEventListener('change', function() {
+        const handleCustomColorChange = function() {
             selectColor(this.value);
             updateActiveColorSwatch(null);
-        });
+        };
 
-        customColorPicker.addEventListener('input', function() {
-            selectColor(this.value);
-            updateActiveColorSwatch(null);
-        });
+        customColorPicker.addEventListener('change', handleCustomColorChange);
+        customColorPicker.addEventListener('input', handleCustomColorChange);
 
         // Pen size
         penSizeSlider.addEventListener('input', function() {
