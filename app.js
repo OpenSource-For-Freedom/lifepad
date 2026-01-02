@@ -130,9 +130,8 @@
 
             const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
             
-            // Shift hue and wrap around
-            hsl.h = (hsl.h + hueDegrees) % 360;
-            if (hsl.h < 0) hsl.h += 360;
+            // Shift hue and wrap around (handles both positive and negative values)
+            hsl.h = ((hsl.h + hueDegrees) % 360 + 360) % 360;
 
             const newRgb = this.hslToRgb(hsl.h, hsl.s, hsl.l);
             return this.rgbToHex(newRgb.r, newRgb.g, newRgb.b);
@@ -1250,13 +1249,16 @@
         // Load hue shift
         const savedHueShift = localStorage.getItem('lifepad-hue-shift');
         if (savedHueShift !== null) {
-            state.hueShift = parseInt(savedHueShift);
-            if (hueShiftSlider) {
-                hueShiftSlider.value = state.hueShift;
-                hueShiftValue.textContent = state.hueShift + '°';
+            const parsedHueShift = parseInt(savedHueShift);
+            if (!isNaN(parsedHueShift) && parsedHueShift >= -180 && parsedHueShift <= 180) {
+                state.hueShift = parsedHueShift;
+                if (hueShiftSlider) {
+                    hueShiftSlider.value = state.hueShift;
+                    hueShiftValue.textContent = state.hueShift + '°';
+                }
+                updateCurrentColor();
+                updateColorSwatchesDisplay();
             }
-            updateCurrentColor();
-            updateColorSwatchesDisplay();
         }
         
         // Load canvas
