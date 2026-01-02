@@ -7,7 +7,7 @@
     // App state
     const state = {
         currentColor: '#000000',
-        baseColor: '#000000', // Store the base color before hue shift
+        baseColor: '#000000', // Store the base color before hue shift (initialized to match currentColor)
         hueShift: 0, // Hue shift in degrees (-180 to 180)
         currentSize: 4,
         currentTexture: 'ink',
@@ -503,8 +503,10 @@
         // Update visual display of color swatches to show hue shift effect
         colorSwatches.forEach(swatch => {
             const baseColor = swatch.dataset.color;
-            const shiftedColor = ColorUtils.shiftHue(baseColor, state.hueShift);
-            swatch.style.background = shiftedColor;
+            if (baseColor) {
+                const shiftedColor = ColorUtils.shiftHue(baseColor, state.hueShift);
+                swatch.style.background = shiftedColor;
+            }
         });
     }
 
