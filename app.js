@@ -7,6 +7,8 @@
     // App state
     const state = {
         currentColor: '#000000',
+        baseColor: '#000000', // Store the base color before hue shift
+        hueShift: 0, // Hue shift in degrees (-180 to 180)
         currentSize: 4,
         currentTexture: 'ink',
         isEraser: false,
@@ -44,11 +46,105 @@
     // UI Constants
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
 
+    // Color utility functions
+    const ColorUtils = {
+        // Convert hex color to RGB
+        hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        },
+
+        // Convert RGB to hex
+        rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = Math.round(x).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        },
+
+        // Convert RGB to HSL
+        rgbToHsl(r, g, b) {
+            r /= 255;
+            g /= 255;
+            b /= 255;
+
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            let h, s, l = (max + min) / 2;
+
+            if (max === min) {
+                h = s = 0; // achromatic
+            } else {
+                const d = max - min;
+                s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+
+                switch (max) {
+                    case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+                    case g: h = ((b - r) / d + 2) / 6; break;
+                    case b: h = ((r - g) / d + 4) / 6; break;
+                }
+            }
+
+            return { h: h * 360, s: s * 100, l: l * 100 };
+        },
+
+        // Convert HSL to RGB
+        hslToRgb(h, s, l) {
+            h /= 360;
+            s /= 100;
+            l /= 100;
+
+            let r, g, b;
+
+            if (s === 0) {
+                r = g = b = l; // achromatic
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+
+            return { r: r * 255, g: g * 255, b: b * 255 };
+        },
+
+        // Apply hue shift to a hex color
+        shiftHue(hex, hueDegrees) {
+            const rgb = this.hexToRgb(hex);
+            if (!rgb) return hex;
+
+            const hsl = this.rgbToHsl(rgb.r, rgb.g, rgb.b);
+            
+            // Shift hue and wrap around
+            hsl.h = (hsl.h + hueDegrees) % 360;
+            if (hsl.h < 0) hsl.h += 360;
+
+            const newRgb = this.hslToRgb(hsl.h, hsl.s, hsl.l);
+            return this.rgbToHex(newRgb.r, newRgb.g, newRgb.b);
+        }
+    };
+
     // DOM elements
     let canvas, ctx, canvasContainer;
     let overlayCanvas, overlayCtx;
     let introOverlay, startBtn, sampleBtn, dontShowAgainCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
+    let hueShiftSlider, hueShiftValue;
     let brushTextureSelect, brushEraserToggle;
     let undoBtn, redoBtn, clearBtn, saveBtn, helpBtn;
     let themeToggleBtn, paperBgCheckbox;
@@ -87,6 +183,8 @@
         customColorPicker = document.getElementById('custom-color');
         penSizeSlider = document.getElementById('pen-size');
         penSizeValue = document.getElementById('pen-size-value');
+        hueShiftSlider = document.getElementById('hue-shift');
+        hueShiftValue = document.getElementById('hue-shift-value');
         brushTextureSelect = document.getElementById('brush-texture');
         brushEraserToggle = document.getElementById('brush-eraser-toggle');
         undoBtn = document.getElementById('undo-btn');
@@ -253,10 +351,24 @@
             updateActiveColorSwatch(null);
         });
 
+        customColorPicker.addEventListener('input', function() {
+            selectColor(this.value);
+            updateActiveColorSwatch(null);
+        });
+
         // Pen size
         penSizeSlider.addEventListener('input', function() {
             state.currentSize = parseInt(this.value);
             penSizeValue.textContent = this.value;
+        });
+
+        // Hue shift
+        hueShiftSlider.addEventListener('input', function() {
+            state.hueShift = parseInt(this.value);
+            hueShiftValue.textContent = this.value + '°';
+            updateCurrentColor();
+            updateColorSwatchesDisplay();
+            localStorage.setItem('lifepad-hue-shift', state.hueShift);
         });
 
         // Brush texture
@@ -377,10 +489,25 @@
 
     // Color selection
     function selectColor(color) {
-        state.currentColor = color;
+        state.baseColor = color;
+        updateCurrentColor();
         state.isEraser = false;
         brushEraserToggle.textContent = 'Brush';
         brushEraserToggle.classList.remove('active');
+    }
+
+    function updateCurrentColor() {
+        // Apply hue shift to base color
+        state.currentColor = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+    }
+
+    function updateColorSwatchesDisplay() {
+        // Update visual display of color swatches to show hue shift effect
+        colorSwatches.forEach(swatch => {
+            const baseColor = swatch.dataset.color;
+            const shiftedColor = ColorUtils.shiftHue(baseColor, state.hueShift);
+            swatch.style.background = shiftedColor;
+        });
     }
 
     function updateActiveColorSwatch(activeSwatch) {
@@ -1118,6 +1245,18 @@
             state.paperMode = true;
             paperBgCheckbox.checked = true;
             canvasContainer.classList.add('paper-mode');
+        }
+        
+        // Load hue shift
+        const savedHueShift = localStorage.getItem('lifepad-hue-shift');
+        if (savedHueShift !== null) {
+            state.hueShift = parseInt(savedHueShift);
+            if (hueShiftSlider) {
+                hueShiftSlider.value = state.hueShift;
+                hueShiftValue.textContent = state.hueShift + '°';
+            }
+            updateCurrentColor();
+            updateColorSwatchesDisplay();
         }
         
         // Load canvas
