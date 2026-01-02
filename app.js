@@ -195,7 +195,9 @@
         const rect = canvasContainer.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         
-        // Save current drawing
+        // Save current canvas size and drawing before resize
+        const oldWidth = canvas.width / dpr;
+        const oldHeight = canvas.height / dpr;
         const imageData = canvas.toDataURL();
         
         // Resize main canvas
@@ -214,11 +216,18 @@
         overlayCanvas.style.height = rect.height + 'px';
         overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Restore drawing
+        // Restore drawing - draw at original size, not stretched
         if (imageData && imageData !== 'data:,') {
             const img = new Image();
             img.onload = function() {
-                ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                // Draw image at its original size (not stretched to new canvas size)
+                // This preserves the drawing exactly as it was before rotation
+                ctx.drawImage(img, 0, 0, oldWidth, oldHeight);
+            };
+            img.onerror = function(err) {
+                console.error('Failed to restore canvas after resize:', err);
+                // Try to restore from localStorage as fallback
+                loadCanvasFromStorage();
             };
             img.src = imageData;
         }
