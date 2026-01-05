@@ -358,9 +358,7 @@
                 ctx.save();
                 ctx.setTransform(1, 0, 0, 1, 0, 0);  // Identity transform
                 ctx.drawImage(img, 0, 0);
-                ctx.restore();
-                // Reapply current zoom/pan transform for future drawing
-                applyDrawTransform();
+                ctx.restore();  // Restores the zoom/pan transform set at line 338
             };
             img.src = oldDrawData;
         }
