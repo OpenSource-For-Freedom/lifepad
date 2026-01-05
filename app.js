@@ -353,12 +353,14 @@
         if (oldDrawData && oldDrawData !== 'data:,') {
             const img = new Image();
             img.onload = function() {
-                // We need to draw at the proper scale
-                // The image was saved with old zoom, we restore at current zoom
+                // Draw image pixel-for-pixel at canvas resolution (without transform)
+                // This preserves the drawing regardless of current zoom level
                 ctx.save();
-                applyDrawTransform();
-                ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
+                ctx.setTransform(1, 0, 0, 1, 0, 0);  // Identity transform
+                ctx.drawImage(img, 0, 0);
                 ctx.restore();
+                // Reapply current zoom/pan transform for future drawing
+                applyDrawTransform();
             };
             img.src = oldDrawData;
         }
