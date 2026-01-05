@@ -334,14 +334,11 @@
         // Set transform for background canvas (always 1:1, no zoom)
         bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Set transform for drawing canvas (DPR only)
+        // Set transform for drawing canvas (with zoom and pan)
         applyDrawTransform();
         
-        // Set transform for overlay canvas (DPR only)
+        // Set transform for overlay canvas (with zoom and pan)
         applyOverlayTransform();
-        
-        // Apply CSS transform for visual zoom and pan
-        applyCanvasTransform();
         
         // Restore background if present
         if (oldBgData && state.bgImageLoaded) {
@@ -367,29 +364,25 @@
         }
     }
     
-    // Apply visual transform to canvas for zoom and pan
-    function applyCanvasTransform() {
-        // Apply CSS transform for visual zoom and pan
-        const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-        const canvases = [drawCanvas, overlayCanvas, bgCanvas];
-        
-        canvases.forEach(canvas => {
-            canvas.style.transform = transform;
-            canvas.style.transformOrigin = '0 0';
-        });
-    }
-    
-    // Apply transform to drawing canvas context (DPR only, no zoom)
+    // Apply transform to drawing canvas context
     function applyDrawTransform() {
         const dpr = window.devicePixelRatio || 1;
-        // Transform: scale by DPR only (zoom is handled by CSS transform)
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // Transform: scale by DPR and zoom, translate by pan
+        ctx.setTransform(
+            dpr * state.zoom, 0,
+            0, dpr * state.zoom,
+            dpr * state.panX, dpr * state.panY
+        );
     }
     
-    // Apply transform to overlay canvas context (DPR only, no zoom)
+    // Apply transform to overlay canvas context
     function applyOverlayTransform() {
         const dpr = window.devicePixelRatio || 1;
-        overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        overlayCtx.setTransform(
+            dpr * state.zoom, 0,
+            0, dpr * state.zoom,
+            dpr * state.panX, dpr * state.panY
+        );
     }
     
     // Convert screen coordinates to world coordinates
@@ -965,8 +958,14 @@
             state.panX = e.clientX - state.panStartX;
             state.panY = e.clientY - state.panStartY;
             
-            // Apply CSS transform for pan
-            applyCanvasTransform();
+            // Re-apply transforms
+            applyDrawTransform();
+            applyOverlayTransform();
+            
+            // Redraw from history
+            if (state.history.length > 0 && state.historyStep >= 0) {
+                restoreHistoryState(state.history[state.historyStep]);
+            }
             return;
         }
         
@@ -1377,7 +1376,13 @@
         state.panX = 0;
         state.panY = 0;
         updateZoomDisplay();
-        applyCanvasTransform();
+        applyDrawTransform();
+        applyOverlayTransform();
+        
+        // Redraw from history to show at new zoom level
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
         
         showToast('Zoom reset to 100%');
     }
@@ -1404,7 +1409,13 @@
         state.panY += (worldAfter.y - worldBefore.y) * state.zoom;
         
         updateZoomDisplay();
-        applyCanvasTransform();
+        applyDrawTransform();
+        applyOverlayTransform();
+        
+        // Redraw from history to show at new zoom level
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
     }
     
     function updateZoomDisplay() {
