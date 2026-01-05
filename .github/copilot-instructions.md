@@ -619,7 +619,10 @@ The app is deployed to GitHub Pages automatically on push to `Primary` branch.
 - Manifest must have correct paths
 
 ### Testing Deployment
-1. Serve locally: `python3 -m http.server 8000`
+1. Serve locally using any static web server:
+   - Python: `python3 -m http.server 8000`
+   - Node.js: `npx http-server -p 8000`
+   - PHP: `php -S localhost:8000`
 2. Open: `http://localhost:8000`
 3. Test all features
 4. Check service worker in DevTools
