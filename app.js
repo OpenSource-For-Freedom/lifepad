@@ -371,12 +371,12 @@
     function applyCanvasTransform() {
         // Apply CSS transform for visual zoom and pan
         const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
-        drawCanvas.style.transform = transform;
-        drawCanvas.style.transformOrigin = '0 0';
-        overlayCanvas.style.transform = transform;
-        overlayCanvas.style.transformOrigin = '0 0';
-        bgCanvas.style.transform = transform;
-        bgCanvas.style.transformOrigin = '0 0';
+        const canvases = [drawCanvas, overlayCanvas, bgCanvas];
+        
+        canvases.forEach(canvas => {
+            canvas.style.transform = transform;
+            canvas.style.transformOrigin = '0 0';
+        });
     }
     
     // Apply transform to drawing canvas context (DPR only, no zoom)
