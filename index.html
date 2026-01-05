@@ -97,6 +97,7 @@
             <div class="nav-section actions-section">
                 <button id="select-tool" class="tool-btn" title="Select and move objects">Select</button>
                 <button id="text-tool" class="tool-btn" title="Add text">Text</button>
+                <button id="pan-tool" class="tool-btn" title="Pan canvas">Pan</button>
                 <button id="brush-eraser-toggle" class="tool-btn active" title="Toggle Brush/Eraser">Brush</button>
                 <button id="undo-btn" class="tool-btn" title="Undo">Undo</button>
                 <button id="redo-btn" class="tool-btn" title="Redo">Redo</button>
@@ -107,6 +108,7 @@
                     <div id="tools-menu" class="dropdown-menu">
                         <button id="shapes-btn" class="dropdown-item">Shapes</button>
                         <button id="ruler-btn" class="dropdown-item">Ruler</button>
+                        <button id="import-bg-btn" class="dropdown-item">Import Background</button>
                         <button id="export-svg-btn" class="dropdown-item">Export SVG</button>
                     </div>
                 </div>
@@ -129,16 +131,17 @@
             </div>
             
             <div class="nav-section zoom-section">
-                <button id="zoom-out-btn" class="tool-btn" title="Zoom out (Ctrl/Cmd -)">-</button>
+                <button id="zoom-out-btn" class="tool-btn" title="Zoom out">-</button>
                 <span id="zoom-level">100%</span>
-                <button id="zoom-in-btn" class="tool-btn" title="Zoom in (Ctrl/Cmd +)">+</button>
-                <button id="zoom-reset-btn" class="tool-btn" title="Reset zoom (Ctrl/Cmd 0)">Reset</button>
+                <button id="zoom-in-btn" class="tool-btn" title="Zoom in">+</button>
+                <button id="zoom-reset-btn" class="tool-btn" title="Reset zoom">Reset</button>
             </div>
         </nav>
 
         <!-- Canvas Container -->
         <div id="canvas-container">
-            <canvas id="drawing-canvas"></canvas>
+            <canvas id="bgCanvas"></canvas>
+            <canvas id="drawCanvas"></canvas>
             <canvas id="overlay-canvas"></canvas>
             <!-- Shapes Panel -->
             <div id="shapes-panel" class="shapes-panel hidden">
@@ -200,6 +203,9 @@
             </div>
         </div>
     </div>
+    
+    <!-- Hidden file input for background image import -->
+    <input type="file" id="bg-image-input" accept="image/*" style="display: none;">
 
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
