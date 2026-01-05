@@ -364,25 +364,36 @@
         }
     }
     
+    // Helper to get transform matrix for zoom and pan
+    function getViewTransform() {
+        const dpr = window.devicePixelRatio || 1;
+        return {
+            a: dpr * state.zoom,
+            b: 0,
+            c: 0,
+            d: dpr * state.zoom,
+            e: dpr * state.panX,
+            f: dpr * state.panY
+        };
+    }
+    
     // Apply transform to drawing canvas context
     function applyDrawTransform() {
-        const dpr = window.devicePixelRatio || 1;
-        // Transform: scale by DPR and zoom, translate by pan
-        ctx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+        const t = getViewTransform();
+        ctx.setTransform(t.a, t.b, t.c, t.d, t.e, t.f);
     }
     
     // Apply transform to overlay canvas context
     function applyOverlayTransform() {
-        const dpr = window.devicePixelRatio || 1;
-        overlayCtx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+        const t = getViewTransform();
+        overlayCtx.setTransform(t.a, t.b, t.c, t.d, t.e, t.f);
+    }
+    
+    // Redraw canvas from current history state
+    function redrawFromCurrentHistoryState() {
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
     }
     
     // Convert screen coordinates to world coordinates
@@ -963,9 +974,7 @@
             applyOverlayTransform();
             
             // Redraw from history
-            if (state.history.length > 0 && state.historyStep >= 0) {
-                restoreHistoryState(state.history[state.historyStep]);
-            }
+            redrawFromCurrentHistoryState();
             return;
         }
         
@@ -1380,9 +1389,7 @@
         applyOverlayTransform();
         
         // Redraw from history to show at new zoom level
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
+        redrawFromCurrentHistoryState();
         
         showToast('Zoom reset to 100%');
     }
@@ -1413,9 +1420,7 @@
         applyOverlayTransform();
         
         // Redraw from history to show at new zoom level
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
+        redrawFromCurrentHistoryState();
     }
     
     function updateZoomDisplay() {
