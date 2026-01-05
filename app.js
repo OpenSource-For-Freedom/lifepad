@@ -1241,14 +1241,21 @@
     function restoreHistoryState(dataUrl) {
         const img = new Image();
         img.onload = function() {
-            // Clear canvas and restore image
+            // Clear canvas and restore image in canvas pixel space
             const dpr = window.devicePixelRatio || 1;
-            ctx.save();
+            
+            // Reset to identity transform
             ctx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            // Clear entire canvas
             ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-            ctx.restore();
+            
+            // Draw saved image pixel-for-pixel at canvas resolution
+            // The saved image is the full canvas bitmap, so we draw it 1:1
+            ctx.drawImage(img, 0, 0);
+            
+            // Reapply the current zoom/pan transform for future drawing
             applyDrawTransform();
-            ctx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
         };
         img.src = dataUrl;
     }
