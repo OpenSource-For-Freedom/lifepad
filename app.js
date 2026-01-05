@@ -1387,11 +1387,6 @@
         applyDrawTransform();
         applyOverlayTransform();
         
-        // Redraw from history
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
-        
         showToast('Zoom reset to 100%');
     }
     
@@ -1419,11 +1414,6 @@
         updateZoomDisplay();
         applyDrawTransform();
         applyOverlayTransform();
-        
-        // Redraw from history
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
     }
     
     function updateZoomDisplay() {
