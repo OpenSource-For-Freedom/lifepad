@@ -377,12 +377,28 @@ html, body {
     background: var(--canvas-bg);
 }
 
-#drawing-canvas {
+/* Background canvas - bottom layer */
+#bgCanvas {
     display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
     touch-action: none;
-    cursor: crosshair;
+    z-index: 1;
 }
 
+/* Drawing canvas - middle layer */
+#drawCanvas {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    touch-action: none;
+    cursor: crosshair;
+    z-index: 2;
+}
+
+/* Overlay canvas - top layer for previews */
 #overlay-canvas {
     display: block;
     position: absolute;

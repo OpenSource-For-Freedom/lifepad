@@ -20,7 +20,7 @@
         maxHistory: 30,
         paperMode: false,
         theme: 'light',
-        activeTool: 'brush', // 'brush', 'eraser', 'select', 'text', 'shape'
+        activeTool: 'brush', // 'brush', 'eraser', 'select', 'text', 'shape', 'pan'
         activeShape: null, // 'rectangle', 'circle', 'ellipse', 'line', 'arrow', 'triangle', 'diamond', 'star'
         shapeFill: false,
         shapeHandDrawn: false,
@@ -32,15 +32,18 @@
         textX: 0,
         textY: 0,
         currentPointerId: null,
-        // Zoom and pan state
-        scale: 1,
-        panX: 0,
-        panY: 0,
+        // Zoom and pan state - view transform
+        zoom: 1.0,           // Current zoom level (1.0 to 1.7)
+        panX: 0,             // Pan offset X in CSS pixels
+        panY: 0,             // Pan offset Y in CSS pixels
         isPanning: false,
         panStartX: 0,
         panStartY: 0,
-        minScale: 0.1,
-        maxScale: 10
+        minZoom: 1.0,        // Minimum zoom (100%)
+        maxZoom: 1.7,        // Maximum zoom (170%)
+        // Background image state
+        bgImage: null,       // Loaded background image
+        bgImageLoaded: false
     };
     
     // UI Constants
@@ -139,7 +142,7 @@
     };
 
     // DOM elements
-    let canvas, ctx, canvasContainer;
+    let bgCanvas, bgCtx, drawCanvas, ctx, canvasContainer;
     let overlayCanvas, overlayCtx;
     let introOverlay, startBtn, sampleBtn, dontShowAgainCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
@@ -148,7 +151,7 @@
     let undoBtn, redoBtn, clearBtn, saveBtn, helpBtn;
     let themeToggleBtn, paperBgCheckbox;
     let toast;
-    let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn;
+    let toolsBtn, toolsMenu, shapesBtn, rulerBtn, exportSvgBtn, importBgBtn;
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
     let toolStatus;
@@ -158,6 +161,10 @@
     let installBtn, iosInstallModal, closeIosInstall;
     // Text and select tool elements
     let selectToolBtn, textToolBtn, textDialog, textInput, textConfirmBtn, textCancelBtn;
+    // Pan tool element
+    let panToolBtn;
+    // Background image input
+    let bgImageInput;
     // Collaboration elements
     let collabBtn, collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
@@ -169,8 +176,10 @@
     // Initialize app
     function init() {
         // Get DOM elements
-        canvas = document.getElementById('drawing-canvas');
-        ctx = canvas.getContext('2d', { willReadFrequently: false });
+        bgCanvas = document.getElementById('bgCanvas');
+        bgCtx = bgCanvas.getContext('2d', { willReadFrequently: false });
+        drawCanvas = document.getElementById('drawCanvas');
+        ctx = drawCanvas.getContext('2d', { willReadFrequently: false });
         overlayCanvas = document.getElementById('overlay-canvas');
         overlayCtx = overlayCanvas.getContext('2d', { willReadFrequently: false });
         canvasContainer = document.getElementById('canvas-container');
@@ -200,6 +209,7 @@
         shapesBtn = document.getElementById('shapes-btn');
         rulerBtn = document.getElementById('ruler-btn');
         exportSvgBtn = document.getElementById('export-svg-btn');
+        importBgBtn = document.getElementById('import-bg-btn');
         shapesPanel = document.getElementById('shapes-panel');
         closeShapesBtn = document.getElementById('close-shapes');
         shapeButtons = document.querySelectorAll('.shape-btn');
@@ -227,10 +237,14 @@
         // Text and select tool elements
         selectToolBtn = document.getElementById('select-tool');
         textToolBtn = document.getElementById('text-tool');
+        panToolBtn = document.getElementById('pan-tool');
         textDialog = document.getElementById('text-dialog');
         textInput = document.getElementById('text-input');
         textConfirmBtn = document.getElementById('text-confirm');
         textCancelBtn = document.getElementById('text-cancel');
+        
+        // Background image input
+        bgImageInput = document.getElementById('bg-image-input');
         
         // Collaboration elements
         collabBtn = document.getElementById('collab-btn');
@@ -266,7 +280,7 @@
         setupCanvas();
         
         // Initialize zoom
-        applyCanvasZoom();
+        updateZoomDisplay();
         
         // Load saved state
         loadState();
@@ -292,60 +306,101 @@
         const rect = canvasContainer.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         
-        // Account for current zoom scale to get actual container size
-        // When CSS transform scale is applied, getBoundingClientRect returns scaled dimensions
-        // We need to divide by scale to get the actual container size
-        const actualWidth = rect.width / state.scale;
-        const actualHeight = rect.height / state.scale;
+        // Get container size in CSS pixels
+        const cssWidth = rect.width;
+        const cssHeight = rect.height;
         
-        // Save current canvas size and drawing before resize
-        const oldWidth = canvas.width / dpr;
-        const oldHeight = canvas.height / dpr;
+        // Save current drawing before resize
+        const oldBgData = state.bgImageLoaded ? bgCanvas.toDataURL() : null;
+        const oldDrawData = drawCanvas.toDataURL();
         
-        // Only resize if dimensions actually changed (avoid unnecessary resizes during zoom)
-        if (Math.abs(oldWidth - actualWidth) < 1 && Math.abs(oldHeight - actualHeight) < 1) {
-            return;
-        }
+        // Resize both canvases to match container
+        // Physical size (with DPR)
+        bgCanvas.width = cssWidth * dpr;
+        bgCanvas.height = cssHeight * dpr;
+        drawCanvas.width = cssWidth * dpr;
+        drawCanvas.height = cssHeight * dpr;
+        overlayCanvas.width = cssWidth * dpr;
+        overlayCanvas.height = cssHeight * dpr;
         
-        // Save to localStorage before resizing to preserve drawing
-        saveCanvasToStorage();
+        // CSS size
+        bgCanvas.style.width = cssWidth + 'px';
+        bgCanvas.style.height = cssHeight + 'px';
+        drawCanvas.style.width = cssWidth + 'px';
+        drawCanvas.style.height = cssHeight + 'px';
+        overlayCanvas.style.width = cssWidth + 'px';
+        overlayCanvas.style.height = cssHeight + 'px';
         
-        const imageData = canvas.toDataURL();
+        // Set transform for background canvas (always 1:1, no zoom)
+        bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Resize main canvas using actual dimensions
-        canvas.width = actualWidth * dpr;
-        canvas.height = actualHeight * dpr;
-        canvas.style.width = actualWidth + 'px';
-        canvas.style.height = actualHeight + 'px';
+        // Set transform for drawing canvas (with zoom and pan)
+        applyDrawTransform();
         
-        // Scale context for high DPI - apply transform so we can draw in CSS pixels
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // Set transform for overlay canvas (with zoom and pan)
+        applyOverlayTransform();
         
-        // Resize overlay canvas with same dimensions and transform
-        overlayCanvas.width = actualWidth * dpr;
-        overlayCanvas.height = actualHeight * dpr;
-        overlayCanvas.style.width = actualWidth + 'px';
-        overlayCanvas.style.height = actualHeight + 'px';
-        overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        
-        // Restore drawing - draw at original size, not stretched
-        if (imageData && imageData !== 'data:,') {
+        // Restore background if present
+        if (oldBgData && state.bgImageLoaded) {
             const img = new Image();
             img.onload = function() {
-                // Draw image at its original size (not stretched to new canvas size)
-                // This preserves the drawing exactly as it was before rotation
-                ctx.drawImage(img, 0, 0, oldWidth, oldHeight);
+                bgCtx.drawImage(img, 0, 0, cssWidth, cssHeight);
             };
-            img.onerror = function(err) {
-                console.error('Failed to restore canvas after resize:', err);
-                // Try to restore from localStorage as fallback
-                loadCanvasFromStorage();
-            };
-            img.src = imageData;
+            img.src = oldBgData;
         }
         
-        // Reapply zoom transform after resize
-        applyCanvasZoom();
+        // Restore drawing
+        if (oldDrawData && oldDrawData !== 'data:,') {
+            const img = new Image();
+            img.onload = function() {
+                // We need to draw at the proper scale
+                // The image was saved with old zoom, we restore at current zoom
+                ctx.save();
+                applyDrawTransform();
+                ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
+                ctx.restore();
+            };
+            img.src = oldDrawData;
+        }
+    }
+    
+    // Apply transform to drawing canvas context
+    function applyDrawTransform() {
+        const dpr = window.devicePixelRatio || 1;
+        // Transform: scale by DPR and zoom, translate by pan
+        ctx.setTransform(
+            dpr * state.zoom, 0,
+            0, dpr * state.zoom,
+            dpr * state.panX, dpr * state.panY
+        );
+    }
+    
+    // Apply transform to overlay canvas context
+    function applyOverlayTransform() {
+        const dpr = window.devicePixelRatio || 1;
+        overlayCtx.setTransform(
+            dpr * state.zoom, 0,
+            0, dpr * state.zoom,
+            dpr * state.panX, dpr * state.panY
+        );
+    }
+    
+    // Convert screen coordinates to world coordinates
+    function screenToWorld(screenX, screenY) {
+        // screenX, screenY are relative to canvas (from clientX - rect.left)
+        // Convert to world coordinates by inverting zoom and pan
+        return {
+            x: (screenX - state.panX) / state.zoom,
+            y: (screenY - state.panY) / state.zoom
+        };
+    }
+    
+    // Convert world coordinates to screen coordinates
+    function worldToScreen(worldX, worldY) {
+        return {
+            x: worldX * state.zoom + state.panX,
+            y: worldY * state.zoom + state.panY
+        };
     }
 
     // Event listeners setup
@@ -435,10 +490,15 @@
         shapesBtn.addEventListener('click', openShapesPanel);
         rulerBtn.addEventListener('click', openRuler);
         exportSvgBtn.addEventListener('click', exportSVG);
+        importBgBtn.addEventListener('click', openBackgroundImport);
 
         // Tool selection
         selectToolBtn.addEventListener('click', activateSelectTool);
         textToolBtn.addEventListener('click', activateTextTool);
+        panToolBtn.addEventListener('click', activatePanTool);
+        
+        // Background image import
+        bgImageInput.addEventListener('change', handleBackgroundImageUpload);
 
         // Shapes panel
         closeShapesBtn.addEventListener('click', closeShapesPanel);
@@ -486,17 +546,17 @@
         });
 
         // Drawing events - using Pointer Events for universal support
-        canvas.addEventListener('pointerdown', startDrawing);
-        canvas.addEventListener('pointermove', draw);
-        canvas.addEventListener('pointerup', stopDrawing);
-        canvas.addEventListener('pointercancel', stopDrawing);
-        canvas.addEventListener('pointerleave', stopDrawing);
+        drawCanvas.addEventListener('pointerdown', startDrawing);
+        drawCanvas.addEventListener('pointermove', draw);
+        drawCanvas.addEventListener('pointerup', stopDrawing);
+        drawCanvas.addEventListener('pointercancel', stopDrawing);
+        drawCanvas.addEventListener('pointerleave', stopDrawing);
 
         // Prevent context menu on long press
-        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        drawCanvas.addEventListener('contextmenu', e => e.preventDefault());
         
         // Zoom with mouse wheel
-        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        drawCanvas.addEventListener('wheel', handleWheel, { passive: false });
         
         // Keyboard shortcuts for zoom
         document.addEventListener('keydown', handleKeyboard);
@@ -563,12 +623,22 @@
         updateToolStatus();
         showToast('Text tool activated - click to place text');
     }
+    
+    function activatePanTool() {
+        state.activeTool = 'pan';
+        state.activeShape = null;
+        state.isEraser = false;
+        updateToolButtons();
+        updateToolStatus();
+        showToast('Pan tool activated - drag to pan canvas');
+    }
 
     function updateToolButtons() {
         // Clear all active states
         brushEraserToggle.classList.remove('active');
         selectToolBtn.classList.remove('active');
         textToolBtn.classList.remove('active');
+        panToolBtn.classList.remove('active');
         
         // Set active state for current tool
         if (state.activeTool === 'brush' || state.activeTool === 'eraser') {
@@ -577,6 +647,8 @@
             selectToolBtn.classList.add('active');
         } else if (state.activeTool === 'text') {
             textToolBtn.classList.add('active');
+        } else if (state.activeTool === 'pan') {
+            panToolBtn.classList.add('active');
         } else if (state.activeTool === 'shape') {
             // No button to highlight for shapes - it's in the panel
         }
@@ -596,12 +668,55 @@
             statusText += 'Select';
         } else if (state.activeTool === 'text') {
             statusText += 'Text';
+        } else if (state.activeTool === 'pan') {
+            statusText += 'Pan';
         } else {
             statusText += state.activeTool;
         }
         
         toolStatus.textContent = statusText;
         console.log('Tool status updated:', statusText);
+    }
+    
+    // Background image import functions
+    function openBackgroundImport() {
+        bgImageInput.click();
+        toolsMenu.classList.remove('show');
+    }
+    
+    function handleBackgroundImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file || !file.type.startsWith('image/')) {
+            showToast('Please select a valid image file');
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = function() {
+                state.bgImage = img;
+                state.bgImageLoaded = true;
+                
+                // Draw image to background canvas at 100% scale (screen space)
+                const rect = canvasContainer.getBoundingClientRect();
+                bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+                bgCtx.save();
+                bgCtx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+                bgCtx.drawImage(img, 0, 0, rect.width, rect.height);
+                bgCtx.restore();
+                
+                showToast('Background image imported');
+            };
+            img.onerror = function() {
+                showToast('Failed to load image');
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+        
+        // Reset input so same file can be selected again
+        e.target.value = '';
     }
 
     // Text tool functions
@@ -643,19 +758,34 @@
     // SVG Export
     function exportSVG() {
         try {
+            // Create a temporary canvas to combine bg and drawing
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Set size to match current view
+            tempCanvas.width = bgCanvas.width;
+            tempCanvas.height = bgCanvas.height;
+            
+            // Draw background at 100% scale
+            tempCtx.drawImage(bgCanvas, 0, 0);
+            
+            // Draw drawing layer at current zoom/pan
+            tempCtx.drawImage(drawCanvas, 0, 0);
+            
             // Create SVG with canvas content
-            const rect = canvas.getBoundingClientRect();
+            const rect = drawCanvas.getBoundingClientRect();
             const svgNS = 'http://www.w3.org/2000/svg';
             const svg = document.createElementNS(svgNS, 'svg');
             svg.setAttribute('width', rect.width);
             svg.setAttribute('height', rect.height);
             svg.setAttribute('xmlns', svgNS);
 
-            // Convert canvas to image and embed in SVG
+            // Convert combined canvas to image and embed in SVG
             const image = document.createElementNS(svgNS, 'image');
             image.setAttribute('width', rect.width);
             image.setAttribute('height', rect.height);
-            image.setAttribute('href', canvas.toDataURL('image/png'));
+            image.setAttribute('href', tempCanvas.toDataURL('image/png'));
             svg.appendChild(image);
 
             // Serialize SVG to string
@@ -713,40 +843,6 @@
         // This gives a consistent baseline (0.5 for mouse, varies for touch)
         return e.pressure;
     }
-    
-    // Coordinate transformation helpers for zoom and pan
-    function screenToCanvas(screenX, screenY) {
-        // Convert screen coordinates to canvas coordinates accounting for CSS zoom
-        // When CSS transform scale is applied, getBoundingClientRect() returns scaled dimensions,
-        // but the actual canvas drawing surface remains at its original size.
-        // We need to divide screen coordinates by the scale factor to get the correct canvas coordinates.
-        return {
-            x: screenX / state.scale,
-            y: screenY / state.scale
-        };
-    }
-    
-    function applyTransform(context) {
-        // No zoom transform applied - drawings are always at 1:1 scale
-        // Zoom is handled via CSS transform on the canvas element
-        const dpr = window.devicePixelRatio || 1;
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    
-    function resetTransform(context) {
-        // Reset to default transform (DPR only)
-        const dpr = window.devicePixelRatio || 1;
-        context.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
-    
-    function applyCanvasZoom() {
-        // Apply CSS transform to visually scale the canvas
-        const transform = `scale(${state.scale})`;
-        canvas.style.transform = transform;
-        canvas.style.transformOrigin = '0 0';
-        overlayCanvas.style.transform = transform;
-        overlayCanvas.style.transformOrigin = '0 0';
-    }
 
     // Drawing functions
     function startDrawing(e) {
@@ -760,20 +856,20 @@
         
         state.currentPointerId = e.pointerId;
         try {
-            canvas.setPointerCapture(e.pointerId);
+            drawCanvas.setPointerCapture(e.pointerId);
         } catch (err) {
             // Pointer capture may fail in some cases, that's okay
             console.log('setPointerCapture failed:', err.message);
         }
         
-        const rect = canvas.getBoundingClientRect();
+        const rect = drawCanvas.getBoundingClientRect();
         const screenX = e.clientX - rect.left;
         const screenY = e.clientY - rect.top;
         
-        // Convert to canvas coordinates with zoom
-        const coords = screenToCanvas(screenX, screenY);
-        const x = coords.x;
-        const y = coords.y;
+        // Convert to world coordinates
+        const world = screenToWorld(screenX, screenY);
+        const x = world.x;
+        const y = world.y;
         
         console.log('pointerdown:', {
             activeTool: state.activeTool,
@@ -781,8 +877,17 @@
             pointerType: e.pointerType,
             pointerId: e.pointerId,
             normalizedPressure: normalizePressure(e),
-            screenX, screenY, x, y, scale: state.scale
+            screenX, screenY, worldX: x, worldY: y, zoom: state.zoom
         });
+
+        // Handle pan tool
+        if (state.activeTool === 'pan') {
+            state.isPanning = true;
+            state.panStartX = e.clientX - state.panX;
+            state.panStartY = e.clientY - state.panY;
+            drawCanvas.style.cursor = 'grabbing';
+            return;
+        }
 
         // Handle text tool
         if (state.activeTool === 'text') {
@@ -839,21 +944,48 @@
             return;
         }
         
-        const rect = canvas.getBoundingClientRect();
+        const rect = drawCanvas.getBoundingClientRect();
         const screenX = e.clientX - rect.left;
         const screenY = e.clientY - rect.top;
         
-        // Convert to canvas coordinates with zoom
-        const coords = screenToCanvas(screenX, screenY);
-        const x = coords.x;
-        const y = coords.y;
+        // Convert to world coordinates
+        const world = screenToWorld(screenX, screenY);
+        const x = world.x;
+        const y = world.y;
+        
+        // Handle panning
+        if (state.isPanning && state.activeTool === 'pan') {
+            state.panX = e.clientX - state.panStartX;
+            state.panY = e.clientY - state.panStartY;
+            
+            // Re-apply transforms
+            applyDrawTransform();
+            applyOverlayTransform();
+            
+            // Redraw from history
+            if (state.history.length > 0 && state.historyStep >= 0) {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.clearRect(-state.panX / state.zoom, -state.panY / state.zoom, 
+                                  drawCanvas.width / (window.devicePixelRatio || 1) / state.zoom, 
+                                  drawCanvas.height / (window.devicePixelRatio || 1) / state.zoom);
+                    ctx.drawImage(img, 0, 0, drawCanvas.width / (window.devicePixelRatio || 1), 
+                                  drawCanvas.height / (window.devicePixelRatio || 1));
+                };
+                img.src = state.history[state.historyStep];
+            }
+            return;
+        }
         
         // Handle shape preview
         if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
-            // Clear overlay (need to reset transform first)
-            resetTransform(overlayCtx);
+            // Clear overlay
+            const dpr = window.devicePixelRatio || 1;
+            overlayCtx.save();
+            overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-            applyTransform(overlayCtx);
+            overlayCtx.restore();
+            applyOverlayTransform();
             
             // Draw shape preview on overlay
             drawShapePreview(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
@@ -915,21 +1047,32 @@
             pointerId: e.pointerId
         });
         
-        const rect = canvas.getBoundingClientRect();
+        const rect = drawCanvas.getBoundingClientRect();
         const screenX = e.clientX - rect.left;
         const screenY = e.clientY - rect.top;
         
-        // Convert to canvas coordinates with zoom
-        const coords = screenToCanvas(screenX, screenY);
-        const x = coords.x;
-        const y = coords.y;
+        // Convert to world coordinates
+        const world = screenToWorld(screenX, screenY);
+        const x = world.x;
+        const y = world.y;
+        
+        // Handle pan end
+        if (state.isPanning && state.activeTool === 'pan') {
+            state.isPanning = false;
+            drawCanvas.style.cursor = 'crosshair';
+            state.currentPointerId = null;
+            return;
+        }
         
         // Handle shape finalization
         if (state.isDrawingShape && state.activeTool === 'shape' && state.activeShape) {
-            // Clear overlay (need to reset transform first)
-            resetTransform(overlayCtx);
+            // Clear overlay
+            const dpr = window.devicePixelRatio || 1;
+            overlayCtx.save();
+            overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-            applyTransform(overlayCtx);
+            overlayCtx.restore();
+            applyOverlayTransform();
             
             // Draw final shape to main canvas
             drawShapeFinal(state.shapeStartX, state.shapeStartY, x, y, state.activeShape);
@@ -960,7 +1103,6 @@
 
     // Brush texture implementations
     function drawInk(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size;
@@ -974,11 +1116,9 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
-        resetTransform(ctx);
     }
 
     function drawPencil(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size * 0.7;
@@ -991,11 +1131,9 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
-        resetTransform(ctx);
     }
 
     function drawMarker(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.lineWidth = size * 1.5;
@@ -1008,11 +1146,9 @@
         ctx.moveTo(x1, y1);
         ctx.quadraticCurveTo(x1, y1, midX, midY);
         ctx.stroke();
-        resetTransform(ctx);
     }
 
     function drawSpray(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = state.currentColor;
         ctx.globalAlpha = 0.1;
@@ -1035,11 +1171,9 @@
                 ctx.fill();
             }
         }
-        resetTransform(ctx);
     }
 
     function drawCharcoal(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
         ctx.globalAlpha = 0.4;
@@ -1056,11 +1190,9 @@
             ctx.lineTo(x2 + offsetX, y2 + offsetY);
             ctx.stroke();
         }
-        resetTransform(ctx);
     }
 
     function drawEraser(x1, y1, x2, y2, size) {
-        applyTransform(ctx);
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = size * 2;
         ctx.globalAlpha = 1;
@@ -1074,7 +1206,6 @@
         ctx.stroke();
         
         ctx.globalCompositeOperation = 'source-over';
-        resetTransform(ctx);
     }
 
     // History management
@@ -1083,7 +1214,7 @@
         state.history = state.history.slice(0, state.historyStep + 1);
         
         // Add new state
-        state.history.push(canvas.toDataURL());
+        state.history.push(drawCanvas.toDataURL());
         
         // Limit history size
         if (state.history.length > state.maxHistory) {
@@ -1110,11 +1241,14 @@
     function restoreHistoryState(dataUrl) {
         const img = new Image();
         img.onload = function() {
-            // Clear canvas and draw image at 1:1 scale
-            // Zoom is handled by CSS transform, not canvas context transform
-            resetTransform(ctx);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+            // Clear canvas and restore image
+            const dpr = window.devicePixelRatio || 1;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            ctx.restore();
+            applyDrawTransform();
+            ctx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
         };
         img.src = dataUrl;
     }
@@ -1122,7 +1256,12 @@
     function clearCanvas() {
         if (confirm('Clear the entire canvas? This cannot be undone.')) {
             saveHistoryState();
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const dpr = window.devicePixelRatio || 1;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            ctx.restore();
+            applyDrawTransform();
             
             // Create sync event
             Sync.createClearEvent();
@@ -1134,10 +1273,25 @@
     // Save and load
     function saveImage() {
         try {
+            // Create a temporary canvas to combine bg and drawing
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Set size to match current view
+            tempCanvas.width = bgCanvas.width;
+            tempCanvas.height = bgCanvas.height;
+            
+            // Draw background at 100% scale
+            tempCtx.drawImage(bgCanvas, 0, 0);
+            
+            // Draw drawing layer at current zoom/pan
+            tempCtx.drawImage(drawCanvas, 0, 0);
+            
             const link = document.createElement('a');
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
             link.download = `lifepad-${timestamp}.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.href = tempCanvas.toDataURL('image/png');
             link.click();
             showToast('Image saved successfully');
         } catch (error) {
@@ -1147,8 +1301,14 @@
 
     function saveCanvasToStorage() {
         try {
-            const dataUrl = canvas.toDataURL('image/png');
+            const dataUrl = drawCanvas.toDataURL('image/png');
             localStorage.setItem('lifepad-canvas', dataUrl);
+            
+            // Also save background if present
+            if (state.bgImageLoaded) {
+                const bgUrl = bgCanvas.toDataURL('image/png');
+                localStorage.setItem('lifepad-bg-canvas', bgUrl);
+            }
         } catch (error) {
             console.error('Failed to save to localStorage:', error);
         }
@@ -1156,11 +1316,25 @@
 
     function loadCanvasFromStorage() {
         try {
+            // Load background
+            const bgDataUrl = localStorage.getItem('lifepad-bg-canvas');
+            if (bgDataUrl) {
+                const bgImg = new Image();
+                bgImg.onload = function() {
+                    state.bgImageLoaded = true;
+                    const dpr = window.devicePixelRatio || 1;
+                    bgCtx.drawImage(bgImg, 0, 0, bgCanvas.width / dpr, bgCanvas.height / dpr);
+                };
+                bgImg.src = bgDataUrl;
+            }
+            
+            // Load drawing
             const dataUrl = localStorage.getItem('lifepad-canvas');
             if (dataUrl) {
                 const img = new Image();
                 img.onload = function() {
-                    ctx.drawImage(img, 0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+                    const dpr = window.devicePixelRatio || 1;
+                    ctx.drawImage(img, 0, 0, drawCanvas.width / dpr, drawCanvas.height / dpr);
                     saveHistoryState();
                 };
                 img.src = dataUrl;
@@ -1185,46 +1359,85 @@
     
     // Zoom and pan functions
     function zoomIn() {
-        zoom(1.2);
+        const rect = drawCanvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        zoomAt(centerX, centerY, 1.1);
     }
     
     function zoomOut() {
-        zoom(1 / 1.2);
+        const rect = drawCanvas.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        zoomAt(centerX, centerY, 1 / 1.1);
     }
     
     function resetZoom() {
-        // Save current canvas state to localStorage before resetting zoom
-        saveCanvasToStorage();
-        
-        state.scale = 1;
+        state.zoom = 1.0;
+        state.panX = 0;
+        state.panY = 0;
         updateZoomDisplay();
-        applyCanvasZoom();
+        applyDrawTransform();
+        applyOverlayTransform();
+        
+        // Redraw from history
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
+        
         showToast('Zoom reset to 100%');
     }
     
-    function zoom(factor) {
-        // Save current canvas state to localStorage before zooming
-        saveCanvasToStorage();
+    function zoomAt(screenX, screenY, factor) {
+        // Calculate world point under cursor before zoom
+        const worldBefore = screenToWorld(screenX, screenY);
         
-        state.scale = Math.max(state.minScale, Math.min(state.maxScale, state.scale * factor));
+        // Apply zoom
+        const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, state.zoom * factor));
+        
+        if (newZoom === state.zoom) {
+            // Already at limit
+            return;
+        }
+        
+        state.zoom = newZoom;
+        
+        // Calculate world point under cursor after zoom (with old pan)
+        const worldAfter = screenToWorld(screenX, screenY);
+        
+        // Adjust pan so world point stays under cursor
+        state.panX += (worldAfter.x - worldBefore.x) * state.zoom;
+        state.panY += (worldAfter.y - worldBefore.y) * state.zoom;
+        
         updateZoomDisplay();
-        applyCanvasZoom();
+        applyDrawTransform();
+        applyOverlayTransform();
+        
+        // Redraw from history
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
     }
     
     function updateZoomDisplay() {
         if (zoomLevel) {
-            zoomLevel.textContent = Math.round(state.scale * 100) + '%';
+            zoomLevel.textContent = Math.round(state.zoom * 100) + '%';
         }
     }
     
     function handleWheel(e) {
         e.preventDefault();
         
+        // Get cursor position relative to canvas
+        const rect = drawCanvas.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        
         // Determine zoom direction
         const delta = e.deltaY;
         const zoomFactor = delta > 0 ? 1 / 1.1 : 1.1;
         
-        zoom(zoomFactor);
+        zoomAt(screenX, screenY, zoomFactor);
     }
     
     function handleKeyboard(e) {
@@ -1243,16 +1456,6 @@
             e.preventDefault();
             resetZoom();
         }
-    }
-    
-    function redrawCanvas() {
-        // Apply CSS zoom transform and redraw from history
-        applyCanvasZoom();
-        requestAnimationFrame(() => {
-            if (state.history.length > 0 && state.historyStep >= 0) {
-                restoreHistoryState(state.history[state.historyStep]);
-            }
-        });
     }
 
     // State management
@@ -1317,8 +1520,8 @@
         ctx.lineCap = 'round';
         ctx.globalAlpha = 1;
         
-        const centerX = canvas.width / (window.devicePixelRatio || 1) / 2;
-        const centerY = canvas.height / (window.devicePixelRatio || 1) / 2;
+        const centerX = drawCanvas.width / (window.devicePixelRatio || 1) / 2;
+        const centerY = drawCanvas.height / (window.devicePixelRatio || 1) / 2;
         
         ctx.beginPath();
         ctx.moveTo(centerX - 100, centerY - 50);
@@ -2782,7 +2985,7 @@
         
         // Normalize point to 0..1 range
         normalizePoint(x, y) {
-            const rect = canvas.getBoundingClientRect();
+            const rect = drawCanvas.getBoundingClientRect();
             return {
                 x: x / rect.width,
                 y: y / rect.height
@@ -2791,7 +2994,7 @@
         
         // Denormalize point from 0..1 range
         denormalizePoint(nx, ny) {
-            const rect = canvas.getBoundingClientRect();
+            const rect = drawCanvas.getBoundingClientRect();
             return {
                 x: nx * rect.width,
                 y: ny * rect.height
@@ -2893,7 +3096,7 @@
         
         // Send snapshot to peer
         async sendSnapshot() {
-            const rect = canvas.getBoundingClientRect();
+            const rect = drawCanvas.getBoundingClientRect();
             const snapshot = {
                 kind: 'snapshot',
                 events: this.eventLog,
@@ -2910,7 +3113,12 @@
         // Handle snapshot from peer
         handleSnapshot(snapshot) {
             // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const dpr = window.devicePixelRatio || 1;
+            ctx.save();
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+            ctx.restore();
+            applyDrawTransform();
             
             // Apply background
             if (snapshot.canvas.bg === 'paper' && !state.paperMode) {
@@ -2993,7 +3201,12 @@
                 saveCanvasToStorage();
                 
             } else if (event.type === 'clear') {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const dpr = window.devicePixelRatio || 1;
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                ctx.restore();
+                applyDrawTransform();
                 saveCanvasToStorage();
             }
         },
