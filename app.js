@@ -292,25 +292,40 @@
         const rect = canvasContainer.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         
+        // Account for current zoom scale to get actual container size
+        // When CSS transform scale is applied, getBoundingClientRect returns scaled dimensions
+        // We need to divide by scale to get the actual container size
+        const actualWidth = rect.width / state.scale;
+        const actualHeight = rect.height / state.scale;
+        
         // Save current canvas size and drawing before resize
         const oldWidth = canvas.width / dpr;
         const oldHeight = canvas.height / dpr;
+        
+        // Only resize if dimensions actually changed (avoid unnecessary resizes during zoom)
+        if (Math.abs(oldWidth - actualWidth) < 1 && Math.abs(oldHeight - actualHeight) < 1) {
+            return;
+        }
+        
+        // Save to localStorage before resizing to preserve drawing
+        saveCanvasToStorage();
+        
         const imageData = canvas.toDataURL();
         
-        // Resize main canvas
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        canvas.style.width = rect.width + 'px';
-        canvas.style.height = rect.height + 'px';
+        // Resize main canvas using actual dimensions
+        canvas.width = actualWidth * dpr;
+        canvas.height = actualHeight * dpr;
+        canvas.style.width = actualWidth + 'px';
+        canvas.style.height = actualHeight + 'px';
         
         // Scale context for high DPI - apply transform so we can draw in CSS pixels
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
         // Resize overlay canvas with same dimensions and transform
-        overlayCanvas.width = rect.width * dpr;
-        overlayCanvas.height = rect.height * dpr;
-        overlayCanvas.style.width = rect.width + 'px';
-        overlayCanvas.style.height = rect.height + 'px';
+        overlayCanvas.width = actualWidth * dpr;
+        overlayCanvas.height = actualHeight * dpr;
+        overlayCanvas.style.width = actualWidth + 'px';
+        overlayCanvas.style.height = actualHeight + 'px';
         overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
         // Restore drawing - draw at original size, not stretched
@@ -328,6 +343,9 @@
             };
             img.src = imageData;
         }
+        
+        // Reapply zoom transform after resize
+        applyCanvasZoom();
     }
 
     // Event listeners setup
@@ -1175,6 +1193,9 @@
     }
     
     function resetZoom() {
+        // Save current canvas state to localStorage before resetting zoom
+        saveCanvasToStorage();
+        
         state.scale = 1;
         updateZoomDisplay();
         applyCanvasZoom();
@@ -1182,6 +1203,9 @@
     }
     
     function zoom(factor) {
+        // Save current canvas state to localStorage before zooming
+        saveCanvasToStorage();
+        
         state.scale = Math.max(state.minScale, Math.min(state.maxScale, state.scale * factor));
         updateZoomDisplay();
         applyCanvasZoom();
