@@ -699,10 +699,12 @@
     // Coordinate transformation helpers for zoom and pan
     function screenToCanvas(screenX, screenY) {
         // Convert screen coordinates to canvas coordinates accounting for CSS zoom
-        // The canvas element is scaled via CSS transform, so we need to account for that
+        // The canvas element is scaled via CSS transform, but getBoundingClientRect()
+        // already returns scaled dimensions, so screenX/screenY are already in the
+        // correct coordinate space. We just need to return them as-is.
         return {
-            x: screenX / state.scale,
-            y: screenY / state.scale
+            x: screenX,
+            y: screenY
         };
     }
     
