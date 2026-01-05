@@ -334,11 +334,14 @@
         // Set transform for background canvas (always 1:1, no zoom)
         bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Set transform for drawing canvas (with zoom and pan)
+        // Set transform for drawing canvas (DPR only)
         applyDrawTransform();
         
-        // Set transform for overlay canvas (with zoom and pan)
+        // Set transform for overlay canvas (DPR only)
         applyOverlayTransform();
+        
+        // Apply CSS transform for visual zoom and pan
+        applyCanvasTransform();
         
         // Restore background if present
         if (oldBgData && state.bgImageLoaded) {
@@ -364,25 +367,29 @@
         }
     }
     
-    // Apply transform to drawing canvas context
-    function applyDrawTransform() {
-        const dpr = window.devicePixelRatio || 1;
-        // Transform: scale by DPR and zoom, translate by pan
-        ctx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+    // Apply visual transform to canvas for zoom and pan
+    function applyCanvasTransform() {
+        // Apply CSS transform for visual zoom and pan
+        const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        drawCanvas.style.transform = transform;
+        drawCanvas.style.transformOrigin = '0 0';
+        overlayCanvas.style.transform = transform;
+        overlayCanvas.style.transformOrigin = '0 0';
+        bgCanvas.style.transform = transform;
+        bgCanvas.style.transformOrigin = '0 0';
     }
     
-    // Apply transform to overlay canvas context
+    // Apply transform to drawing canvas context (DPR only, no zoom)
+    function applyDrawTransform() {
+        const dpr = window.devicePixelRatio || 1;
+        // Transform: scale by DPR only (zoom is handled by CSS transform)
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    
+    // Apply transform to overlay canvas context (DPR only, no zoom)
     function applyOverlayTransform() {
         const dpr = window.devicePixelRatio || 1;
-        overlayCtx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+        overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     
     // Convert screen coordinates to world coordinates
@@ -958,22 +965,8 @@
             state.panX = e.clientX - state.panStartX;
             state.panY = e.clientY - state.panStartY;
             
-            // Re-apply transforms
-            applyDrawTransform();
-            applyOverlayTransform();
-            
-            // Redraw from history
-            if (state.history.length > 0 && state.historyStep >= 0) {
-                const img = new Image();
-                img.onload = function() {
-                    ctx.clearRect(-state.panX / state.zoom, -state.panY / state.zoom, 
-                                  drawCanvas.width / (window.devicePixelRatio || 1) / state.zoom, 
-                                  drawCanvas.height / (window.devicePixelRatio || 1) / state.zoom);
-                    ctx.drawImage(img, 0, 0, drawCanvas.width / (window.devicePixelRatio || 1), 
-                                  drawCanvas.height / (window.devicePixelRatio || 1));
-                };
-                img.src = state.history[state.historyStep];
-            }
+            // Apply CSS transform for pan
+            applyCanvasTransform();
             return;
         }
         
@@ -1384,8 +1377,7 @@
         state.panX = 0;
         state.panY = 0;
         updateZoomDisplay();
-        applyDrawTransform();
-        applyOverlayTransform();
+        applyCanvasTransform();
         
         showToast('Zoom reset to 100%');
     }
@@ -1412,8 +1404,7 @@
         state.panY += (worldAfter.y - worldBefore.y) * state.zoom;
         
         updateZoomDisplay();
-        applyDrawTransform();
-        applyOverlayTransform();
+        applyCanvasTransform();
     }
     
     function updateZoomDisplay() {
