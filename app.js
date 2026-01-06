@@ -972,9 +972,6 @@
             // Re-apply transforms
             applyDrawTransform();
             applyOverlayTransform();
-            
-            // Redraw from history
-            redrawFromCurrentHistoryState();
             return;
         }
         
@@ -1388,9 +1385,6 @@
         applyDrawTransform();
         applyOverlayTransform();
         
-        // Redraw from history to show at new zoom level
-        redrawFromCurrentHistoryState();
-        
         showToast('Zoom reset to 100%');
     }
     
@@ -1418,9 +1412,6 @@
         updateZoomDisplay();
         applyDrawTransform();
         applyOverlayTransform();
-        
-        // Redraw from history to show at new zoom level
-        redrawFromCurrentHistoryState();
     }
     
     function updateZoomDisplay() {
