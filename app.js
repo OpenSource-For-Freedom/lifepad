@@ -334,11 +334,14 @@
         // Set transform for background canvas (always 1:1, no zoom)
         bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
         
-        // Set transform for drawing canvas (with zoom and pan)
+        // Set transform for drawing canvas (DPR only)
         applyDrawTransform();
         
-        // Set transform for overlay canvas (with zoom and pan)
+        // Set transform for overlay canvas (DPR only)
         applyOverlayTransform();
+        
+        // Apply CSS transform for visual zoom and pan
+        applyCanvasTransform();
         
         // Restore background if present
         if (oldBgData && state.bgImageLoaded) {
@@ -353,53 +356,63 @@
         if (oldDrawData && oldDrawData !== 'data:,') {
             const img = new Image();
             img.onload = function() {
-                // We need to draw at the proper scale
-                // The image was saved with old zoom, we restore at current zoom
+                // Draw image pixel-for-pixel at canvas resolution (without transform)
+                // This preserves the drawing regardless of current zoom level
                 ctx.save();
-                applyDrawTransform();
-                ctx.drawImage(img, 0, 0, cssWidth, cssHeight);
-                ctx.restore();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);  // Identity transform
+                ctx.drawImage(img, 0, 0);
+                ctx.restore();  // Restores the zoom/pan transform set at line 338
             };
             img.src = oldDrawData;
         }
     }
     
-    // Apply transform to drawing canvas context
-    function applyDrawTransform() {
-        const dpr = window.devicePixelRatio || 1;
-        // Transform: scale by DPR and zoom, translate by pan
-        ctx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+    // Apply CSS transform to canvases for visual zoom
+    function applyCanvasTransform() {
+        const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+        const canvases = [drawCanvas, overlayCanvas, bgCanvas];
+        
+        canvases.forEach(canvas => {
+            canvas.style.transform = transform;
+            canvas.style.transformOrigin = '0 0';
+        });
     }
     
-    // Apply transform to overlay canvas context
+    // Apply transform to drawing canvas context (DPR only, no zoom)
+    function applyDrawTransform() {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    
+    // Apply transform to overlay canvas context (DPR only, no zoom)
     function applyOverlayTransform() {
         const dpr = window.devicePixelRatio || 1;
-        overlayCtx.setTransform(
-            dpr * state.zoom, 0,
-            0, dpr * state.zoom,
-            dpr * state.panX, dpr * state.panY
-        );
+        overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    
+    // Redraw canvas from current history state
+    function redrawFromCurrentHistoryState() {
+        if (state.history.length > 0 && state.historyStep >= 0) {
+            restoreHistoryState(state.history[state.historyStep]);
+        }
     }
     
     // Convert screen coordinates to world coordinates
     function screenToWorld(screenX, screenY) {
         // screenX, screenY are relative to canvas (from clientX - rect.left)
-        // Convert to world coordinates by inverting zoom and pan
+        // With CSS transform, we need to account for the scale
+        // Divide by zoom to get actual canvas coordinates
         return {
-            x: (screenX - state.panX) / state.zoom,
-            y: (screenY - state.panY) / state.zoom
+            x: screenX / state.zoom,
+            y: screenY / state.zoom
         };
     }
     
     // Convert world coordinates to screen coordinates
     function worldToScreen(worldX, worldY) {
         return {
-            x: worldX * state.zoom + state.panX,
-            y: worldY * state.zoom + state.panY
+            x: worldX * state.zoom,
+            y: worldY * state.zoom
         };
     }
 
@@ -958,22 +971,8 @@
             state.panX = e.clientX - state.panStartX;
             state.panY = e.clientY - state.panStartY;
             
-            // Re-apply transforms
-            applyDrawTransform();
-            applyOverlayTransform();
-            
-            // Redraw from history
-            if (state.history.length > 0 && state.historyStep >= 0) {
-                const img = new Image();
-                img.onload = function() {
-                    ctx.clearRect(-state.panX / state.zoom, -state.panY / state.zoom, 
-                                  drawCanvas.width / (window.devicePixelRatio || 1) / state.zoom, 
-                                  drawCanvas.height / (window.devicePixelRatio || 1) / state.zoom);
-                    ctx.drawImage(img, 0, 0, drawCanvas.width / (window.devicePixelRatio || 1), 
-                                  drawCanvas.height / (window.devicePixelRatio || 1));
-                };
-                img.src = state.history[state.historyStep];
-            }
+            // Apply CSS transform for pan
+            applyCanvasTransform();
             return;
         }
         
@@ -1384,46 +1383,31 @@
         state.panX = 0;
         state.panY = 0;
         updateZoomDisplay();
-        applyDrawTransform();
-        applyOverlayTransform();
-        
-        // Redraw from history
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
+        applyCanvasTransform();
         
         showToast('Zoom reset to 100%');
     }
     
     function zoomAt(screenX, screenY, factor) {
-        // Calculate world point under cursor before zoom
-        const worldBefore = screenToWorld(screenX, screenY);
-        
         // Apply zoom
+        const oldZoom = state.zoom;
         const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, state.zoom * factor));
         
-        if (newZoom === state.zoom) {
+        if (newZoom === oldZoom) {
             // Already at limit
             return;
         }
         
         state.zoom = newZoom;
         
-        // Calculate world point under cursor after zoom (with old pan)
-        const worldAfter = screenToWorld(screenX, screenY);
-        
-        // Adjust pan so world point stays under cursor
-        state.panX += (worldAfter.x - worldBefore.x) * state.zoom;
-        state.panY += (worldAfter.y - worldBefore.y) * state.zoom;
+        // Adjust pan to keep the point under cursor stationary
+        // With CSS transform order translate-then-scale, we need to adjust pan in unscaled space
+        const zoomRatio = newZoom / oldZoom;
+        state.panX = screenX - (screenX - state.panX) * zoomRatio;
+        state.panY = screenY - (screenY - state.panY) * zoomRatio;
         
         updateZoomDisplay();
-        applyDrawTransform();
-        applyOverlayTransform();
-        
-        // Redraw from history
-        if (state.history.length > 0 && state.historyStep >= 0) {
-            restoreHistoryState(state.history[state.historyStep]);
-        }
+        applyCanvasTransform();
     }
     
     function updateZoomDisplay() {
