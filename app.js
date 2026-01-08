@@ -369,7 +369,7 @@
     
     // Apply CSS transform to canvases for visual zoom
     function applyCanvasTransform() {
-        const transform = `scale(${state.zoom}) translate(${state.panX}px, ${state.panY}px)`;
+        const transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
         const canvases = [drawCanvas, overlayCanvas, bgCanvas];
         
         canvases.forEach(canvas => {
@@ -1389,25 +1389,22 @@
     }
     
     function zoomAt(screenX, screenY, factor) {
-        // Calculate world point under cursor before zoom
-        const worldBefore = screenToWorld(screenX, screenY);
-        
         // Apply zoom
+        const oldZoom = state.zoom;
         const newZoom = Math.max(state.minZoom, Math.min(state.maxZoom, state.zoom * factor));
         
-        if (newZoom === state.zoom) {
+        if (newZoom === oldZoom) {
             // Already at limit
             return;
         }
         
         state.zoom = newZoom;
         
-        // Calculate world point under cursor after zoom (with old pan)
-        const worldAfter = screenToWorld(screenX, screenY);
-        
-        // Adjust pan so world point stays under cursor
-        state.panX += (worldAfter.x - worldBefore.x) * state.zoom;
-        state.panY += (worldAfter.y - worldBefore.y) * state.zoom;
+        // Adjust pan to keep the point under cursor stationary
+        // With CSS transform order translate-then-scale, we need to adjust pan in unscaled space
+        const zoomRatio = newZoom / oldZoom;
+        state.panX = screenX - (screenX - state.panX) * zoomRatio;
+        state.panY = screenY - (screenY - state.panY) * zoomRatio;
         
         updateZoomDisplay();
         applyCanvasTransform();
