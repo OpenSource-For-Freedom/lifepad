@@ -547,15 +547,15 @@ html, body {
     .nav-content.active {
         display: flex !important;
         flex-direction: column;
-        gap: 12px;
+        gap: 8px; /* Reduce gap between sections */
         align-items: stretch;
-        padding: 12px 8px; /* Add horizontal padding for more room */
+        padding: 8px 8px; /* Reduce vertical padding */
     }
     
     .nav-section {
-        gap: 8px;
+        gap: 6px; /* Reduce gap within sections */
         width: 100%;
-        padding: 8px 0;
+        padding: 6px 0; /* Reduce section padding */
         border-bottom: 1px solid var(--border-color);
     }
     
@@ -572,7 +572,7 @@ html, body {
     .actions-section {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px; /* Reduce gap between buttons */
         width: 100%;
     }
     
@@ -595,9 +595,9 @@ html, body {
     }
     
     .tool-btn {
-        padding: 8px 10px; /* Increase padding for better fit */
-        font-size: 13px;
-        min-height: 32px;
+        padding: 6px 8px; /* Smaller padding for compact buttons */
+        font-size: 12px; /* Smaller font size */
+        min-height: 28px; /* Reduce min-height */
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
