@@ -577,8 +577,8 @@
         // Close nav menu when clicking on any interactive element (for better mobile UX)
         navMenu.addEventListener('click', function(e) {
             const target = e.target;
-            // Check if clicked element is an interactive control
-            const isInteractive = INTERACTIVE_ELEMENTS.includes(target.tagName);
+            // Check if clicked element is an interactive control (normalize tagName to uppercase)
+            const isInteractive = INTERACTIVE_ELEMENTS.includes(target.tagName.toUpperCase());
             
             if (isInteractive) {
                 // Small delay to ensure the action is registered before closing
