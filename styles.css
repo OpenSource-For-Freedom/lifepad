@@ -555,7 +555,7 @@ html, body {
         overflow-y: auto;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
-        z-index: 998; /* Above toast (999) but below modals (1000) */
+        z-index: 998; /* Below toast (999) and modals (1000) */
     }
     
     /* Show menu when active */

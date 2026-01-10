@@ -584,6 +584,7 @@
             if (isInteractive) {
                 // Small delay to ensure the action is registered before closing
                 setTimeout(() => {
+                    // Check viewport width only when user interacts (not continuous, minimal performance impact)
                     if (window.innerWidth <= MOBILE_BREAKPOINT && navMenu.classList.contains('active')) {
                         toggleNavMenu();
                     }
