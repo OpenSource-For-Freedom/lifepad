@@ -155,6 +155,8 @@
     let shapesPanel, closeShapesBtn, shapeButtons, shapeFillCheckbox, shapeRoughCheckbox;
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
     let toolStatus;
+    // Hamburger menu elements
+    let hamburgerBtn, navMenu;
     // Zoom elements
     let zoomInBtn, zoomOutBtn, zoomResetBtn, zoomLevel;
     // PWA install elements
@@ -204,6 +206,8 @@
         paperBgCheckbox = document.getElementById('paper-bg');
         toast = document.getElementById('toast');
         colorSwatches = document.querySelectorAll('.color-swatch');
+        hamburgerBtn = document.getElementById('hamburger-btn');
+        navMenu = document.getElementById('nav-menu');
         toolsBtn = document.getElementById('tools-btn');
         toolsMenu = document.getElementById('tools-menu');
         shapesBtn = document.getElementById('shapes-btn');
@@ -418,6 +422,9 @@
 
     // Event listeners setup
     function setupEventListeners() {
+        // Hamburger menu
+        hamburgerBtn.addEventListener('click', toggleNavMenu);
+        
         // Intro overlay
         startBtn.addEventListener('click', closeIntro);
         sampleBtn.addEventListener('click', openSampleCanvas);
@@ -555,6 +562,26 @@
         document.addEventListener('click', function(e) {
             if (!toolsBtn.contains(e.target) && !toolsMenu.contains(e.target)) {
                 toolsMenu.classList.remove('show');
+            }
+            // Close nav menu when clicking outside on mobile
+            if (navMenu.classList.contains('active') && 
+                !navMenu.contains(e.target) && 
+                !hamburgerBtn.contains(e.target)) {
+                toggleNavMenu();
+            }
+        });
+        
+        // Close nav menu when clicking on any nav-section button (for better mobile UX)
+        navMenu.addEventListener('click', function(e) {
+            if (e.target.classList.contains('tool-btn') || 
+                e.target.classList.contains('color-swatch') ||
+                e.target.type === 'color') {
+                // Small delay to ensure the action is registered before closing
+                setTimeout(() => {
+                    if (window.innerWidth <= 768 && navMenu.classList.contains('active')) {
+                        toggleNavMenu();
+                    }
+                }, 100);
             }
         });
 
@@ -1361,6 +1388,11 @@
         state.paperMode = paperBgCheckbox.checked;
         canvasContainer.classList.toggle('paper-mode', state.paperMode);
         localStorage.setItem('lifepad-paper-mode', state.paperMode);
+    }
+    
+    function toggleNavMenu() {
+        hamburgerBtn.classList.toggle('active');
+        navMenu.classList.toggle('active');
     }
     
     // Zoom and pan functions
