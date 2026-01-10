@@ -39,7 +39,6 @@ html, body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
-    touch-action: none;
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -375,6 +374,7 @@ html, body {
     position: relative;
     overflow: hidden;
     background: var(--canvas-bg);
+    touch-action: none;
 }
 
 /* Background canvas - bottom layer */
