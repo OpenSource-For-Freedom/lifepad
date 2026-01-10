@@ -48,9 +48,6 @@
     
     // UI Constants
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
-    const MOBILE_BREAKPOINT = 768; // Viewport width in pixels for mobile layout
-    const MENU_CLOSE_DELAY = 100; // Delay in ms before closing mobile menu after action
-    const INTERACTIVE_ELEMENTS = ['BUTTON', 'INPUT', 'SELECT']; // Elements that trigger menu close on mobile
 
     // Color utility functions
     const ColorUtils = {
@@ -159,7 +156,7 @@
     let rulerOverlay, closeRulerBtn, horizontalRuler, verticalRuler, rulerScaleSlider, rulerScaleValue, rulerResetBtn;
     let toolStatus;
     // Hamburger menu elements
-    let hamburgerBtn, navMenu;
+    let hamburgerBtn, navContent;
     // Zoom elements
     let zoomInBtn, zoomOutBtn, zoomResetBtn, zoomLevel;
     // PWA install elements
@@ -210,7 +207,7 @@
         toast = document.getElementById('toast');
         colorSwatches = document.querySelectorAll('.color-swatch');
         hamburgerBtn = document.getElementById('hamburger-btn');
-        navMenu = document.getElementById('nav-menu');
+        navContent = document.getElementById('nav-content');
         toolsBtn = document.getElementById('tools-btn');
         toolsMenu = document.getElementById('tools-menu');
         shapesBtn = document.getElementById('shapes-btn');
@@ -565,29 +562,6 @@
         document.addEventListener('click', function(e) {
             if (!toolsBtn.contains(e.target) && !toolsMenu.contains(e.target)) {
                 toolsMenu.classList.remove('show');
-            }
-            // Close nav menu when clicking outside on mobile
-            if (navMenu.classList.contains('active') && 
-                !navMenu.contains(e.target) && 
-                !hamburgerBtn.contains(e.target)) {
-                toggleNavMenu();
-            }
-        });
-        
-        // Close nav menu when clicking on any interactive element (for better mobile UX)
-        navMenu.addEventListener('click', function(e) {
-            const target = e.target;
-            // Check if clicked element is an interactive control (normalize tagName to uppercase)
-            const isInteractive = INTERACTIVE_ELEMENTS.includes(target.tagName.toUpperCase());
-            
-            if (isInteractive) {
-                // Small delay to ensure the action is registered before closing
-                setTimeout(() => {
-                    // Check viewport width only when user interacts (not continuous, minimal performance impact)
-                    if (window.innerWidth <= MOBILE_BREAKPOINT && navMenu.classList.contains('active')) {
-                        toggleNavMenu();
-                    }
-                }, MENU_CLOSE_DELAY);
             }
         });
 
@@ -1398,7 +1372,7 @@
     
     function toggleNavMenu() {
         hamburgerBtn.classList.toggle('active');
-        navMenu.classList.toggle('active');
+        navContent.classList.toggle('active');
     }
     
     // Zoom and pan functions
