@@ -568,29 +568,26 @@ html, body {
         min-width: auto;
     }
     
-    /* Stack action buttons in rows */
+    /* Stack action buttons in single column for better fit */
     .actions-section {
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
         gap: 8px;
+        width: 100%;
     }
     
     .actions-section .tool-btn {
-        flex: 1 1 calc(50% - 4px);
-        min-width: 0; /* Remove min-width to prevent cutoff */
-        max-width: calc(50% - 4px); /* Ensure buttons don't exceed half width */
+        width: 100%;
+        flex: none;
     }
     
     /* Special handling for Tools dropdown container */
     .actions-section .tools-dropdown {
-        flex: 1 1 calc(50% - 4px);
-        min-width: 0;
-        max-width: calc(50% - 4px);
+        width: 100%;
     }
     
     .actions-section .tools-dropdown .tool-btn {
         width: 100%;
-        max-width: none;
     }
     
     .nav-section label {

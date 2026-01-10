@@ -1,7 +1,7 @@
 // Service Worker for lifePAD
 // Provides offline functionality and caching
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `lifepad-cache-${CACHE_VERSION}`;
 
 // Files to cache for offline use
