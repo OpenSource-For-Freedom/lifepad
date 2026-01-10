@@ -48,6 +48,8 @@
     
     // UI Constants
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
+    const MOBILE_BREAKPOINT = 768; // Viewport width in pixels for mobile layout
+    const MENU_CLOSE_DELAY = 100; // Delay in ms before closing mobile menu after action
 
     // Color utility functions
     const ColorUtils = {
@@ -578,10 +580,10 @@
                 e.target.type === 'color') {
                 // Small delay to ensure the action is registered before closing
                 setTimeout(() => {
-                    if (window.innerWidth <= 768 && navMenu.classList.contains('active')) {
+                    if (window.innerWidth <= MOBILE_BREAKPOINT && navMenu.classList.contains('active')) {
                         toggleNavMenu();
                     }
-                }, 100);
+                }, MENU_CLOSE_DELAY);
             }
         });
 
