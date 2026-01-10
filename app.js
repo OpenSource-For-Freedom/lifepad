@@ -50,6 +50,7 @@
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
     const MOBILE_BREAKPOINT = 768; // Viewport width in pixels for mobile layout
     const MENU_CLOSE_DELAY = 100; // Delay in ms before closing mobile menu after action
+    const INTERACTIVE_ELEMENTS = ['BUTTON', 'INPUT', 'SELECT']; // Elements that trigger menu close on mobile
 
     // Color utility functions
     const ColorUtils = {
@@ -576,10 +577,8 @@
         // Close nav menu when clicking on any interactive element (for better mobile UX)
         navMenu.addEventListener('click', function(e) {
             const target = e.target;
-            // Check if clicked element is an interactive control (button, input, or select)
-            const isInteractive = target.tagName === 'BUTTON' || 
-                                 target.tagName === 'INPUT' || 
-                                 target.tagName === 'SELECT';
+            // Check if clicked element is an interactive control
+            const isInteractive = INTERACTIVE_ELEMENTS.includes(target.tagName);
             
             if (isInteractive) {
                 // Small delay to ensure the action is registered before closing
