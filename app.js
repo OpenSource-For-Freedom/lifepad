@@ -573,11 +573,17 @@
             }
         });
         
-        // Close nav menu when clicking on any nav-section button (for better mobile UX)
+        // Close nav menu when clicking on any interactive element (for better mobile UX)
         navMenu.addEventListener('click', function(e) {
-            if (e.target.classList.contains('tool-btn') || 
-                e.target.classList.contains('color-swatch') ||
-                e.target.type === 'color') {
+            const target = e.target;
+            // Check if clicked element is an interactive control
+            const isInteractive = target.tagName === 'BUTTON' || 
+                                 target.tagName === 'INPUT' || 
+                                 target.tagName === 'SELECT' ||
+                                 target.classList.contains('tool-btn') || 
+                                 target.classList.contains('color-swatch');
+            
+            if (isInteractive) {
                 // Small delay to ensure the action is registered before closing
                 setTimeout(() => {
                     if (window.innerWidth <= MOBILE_BREAKPOINT && navMenu.classList.contains('active')) {
