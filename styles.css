@@ -546,13 +546,38 @@ html, body {
     
     .nav-content.active {
         display: flex !important;
-        flex-wrap: wrap;
-        gap: 16px;
-        align-items: center;
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+        padding: 12px 0;
     }
     
     .nav-section {
-        gap: 6px;
+        gap: 8px;
+        width: 100%;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .nav-section:last-child {
+        border-bottom: none;
+    }
+    
+    /* Make colors wrap nicely */
+    .colors-section {
+        min-width: auto;
+    }
+    
+    /* Stack action buttons in rows */
+    .actions-section {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .actions-section .tool-btn {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 120px;
     }
     
     .nav-section label {
