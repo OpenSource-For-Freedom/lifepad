@@ -32,6 +32,19 @@
         textX: 0,
         textY: 0,
         currentPointerId: null,
+        // Selection and manipulation state
+        isDraggingObject: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragOriginalX1: 0,
+        dragOriginalY1: 0,
+        dragOriginalX2: 0,
+        dragOriginalY2: 0,
+        isResizing: false,
+        resizeHandle: null,
+        resizeStartX: 0,
+        resizeStartY: 0,
+        resizeOriginalBounds: null,
         // Zoom and pan state - view transform
         zoom: 1.0,           // Current zoom level (1.0 to 1.7)
         panX: 0,             // Pan offset X in CSS pixels
@@ -931,8 +944,39 @@
 
         // Handle select tool
         if (state.activeTool === 'select') {
-            showToast('Select tool - object selection coming soon');
-            state.currentPointerId = null;
+            const selectedObj = findObjectAt(x, y);
+            if (selectedObj) {
+                state.selectedObject = selectedObj;
+                // Check if clicking on a resize handle
+                const handle = getResizeHandleAt(x, y, selectedObj);
+                if (handle) {
+                    state.isResizing = true;
+                    state.resizeHandle = handle;
+                    state.resizeStartX = x;
+                    state.resizeStartY = y;
+                    state.resizeOriginalBounds = {
+                        x1: selectedObj.x1,
+                        y1: selectedObj.y1,
+                        x2: selectedObj.x2,
+                        y2: selectedObj.y2
+                    };
+                } else {
+                    state.isDraggingObject = true;
+                    state.dragStartX = x;
+                    state.dragStartY = y;
+                    state.dragOriginalX1 = selectedObj.x1;
+                    state.dragOriginalY1 = selectedObj.y1;
+                    state.dragOriginalX2 = selectedObj.x2;
+                    state.dragOriginalY2 = selectedObj.y2;
+                }
+                redrawCanvas();
+            } else {
+                // Clicked empty space - deselect
+                if (state.selectedObject) {
+                    state.selectedObject = null;
+                    redrawCanvas();
+                }
+            }
             return;
         }
         
@@ -990,6 +1034,56 @@
             
             // Apply CSS transform for pan
             applyCanvasTransform();
+            return;
+        }
+        
+        // Handle object dragging
+        if (state.isDraggingObject && state.selectedObject) {
+            const deltaX = x - state.dragStartX;
+            const deltaY = y - state.dragStartY;
+            
+            state.selectedObject.x1 = state.dragOriginalX1 + deltaX;
+            state.selectedObject.y1 = state.dragOriginalY1 + deltaY;
+            state.selectedObject.x2 = state.dragOriginalX2 + deltaX;
+            state.selectedObject.y2 = state.dragOriginalY2 + deltaY;
+            
+            redrawCanvas();
+            return;
+        }
+        
+        // Handle object resizing
+        if (state.isResizing && state.selectedObject) {
+            const deltaX = x - state.resizeStartX;
+            const deltaY = y - state.resizeStartY;
+            
+            const handle = state.resizeHandle;
+            const obj = state.selectedObject;
+            const orig = state.resizeOriginalBounds;
+            
+            // Update bounds based on which handle is being dragged
+            if (handle === 'nw') {
+                obj.x1 = orig.x1 + deltaX;
+                obj.y1 = orig.y1 + deltaY;
+            } else if (handle === 'ne') {
+                obj.x2 = orig.x2 + deltaX;
+                obj.y1 = orig.y1 + deltaY;
+            } else if (handle === 'sw') {
+                obj.x1 = orig.x1 + deltaX;
+                obj.y2 = orig.y2 + deltaY;
+            } else if (handle === 'se') {
+                obj.x2 = orig.x2 + deltaX;
+                obj.y2 = orig.y2 + deltaY;
+            } else if (handle === 'n') {
+                obj.y1 = orig.y1 + deltaY;
+            } else if (handle === 's') {
+                obj.y2 = orig.y2 + deltaY;
+            } else if (handle === 'e') {
+                obj.x2 = orig.x2 + deltaX;
+            } else if (handle === 'w') {
+                obj.x1 = orig.x1 + deltaX;
+            }
+            
+            redrawCanvas();
             return;
         }
         
@@ -1076,6 +1170,26 @@
         if (state.isPanning && state.activeTool === 'pan') {
             state.isPanning = false;
             drawCanvas.style.cursor = 'crosshair';
+            state.currentPointerId = null;
+            return;
+        }
+        
+        // Handle object drag end
+        if (state.isDraggingObject) {
+            state.isDraggingObject = false;
+            saveHistoryState();
+            saveCanvasToStorage();
+            state.currentPointerId = null;
+            return;
+        }
+        
+        // Handle object resize end
+        if (state.isResizing) {
+            state.isResizing = false;
+            state.resizeHandle = null;
+            state.resizeOriginalBounds = null;
+            saveHistoryState();
+            saveCanvasToStorage();
             state.currentPointerId = null;
             return;
         }
@@ -1640,6 +1754,21 @@
         if (state.shapeHandDrawn) {
             applyHandDrawnEffect(ctx, x1, y1, x2, y2, width, height, shape);
         }
+        
+        // Store shape object for later selection/manipulation
+        const shapeObj = {
+            type: 'shape',
+            shape: shape,
+            x1: x1,
+            y1: y1,
+            x2: x2,
+            y2: y2,
+            color: state.currentColor,
+            lineWidth: state.currentSize,
+            fill: state.shapeFill,
+            handDrawn: state.shapeHandDrawn
+        };
+        state.objects.push(shapeObj);
     }
 
     function drawShapeGeometry(context, x1, y1, x2, y2, width, height, shape, fill) {
@@ -2566,6 +2695,246 @@
             throw new Error('Copy command failed');
         }
         // Caller handles success/error messages
+    }
+
+    // ============================================
+    // SHAPE SELECTION AND MANIPULATION HELPERS
+    // ============================================
+    
+    // Find object at given coordinates
+    function findObjectAt(x, y) {
+        // Search from end to start (top to bottom in z-order)
+        for (let i = state.objects.length - 1; i >= 0; i--) {
+            const obj = state.objects[i];
+            if (obj.type === 'shape') {
+                if (isPointInShape(x, y, obj)) {
+                    return obj;
+                }
+            } else if (obj.type === 'text') {
+                // Simple bounding box check for text
+                const bbox = getTextBoundingBox(obj);
+                if (x >= bbox.x && x <= bbox.x + bbox.width &&
+                    y >= bbox.y && y <= bbox.y + bbox.height) {
+                    return obj;
+                }
+            }
+        }
+        return null;
+    }
+    
+    // Check if point is inside a shape
+    function isPointInShape(x, y, obj) {
+        const x1 = Math.min(obj.x1, obj.x2);
+        const y1 = Math.min(obj.y1, obj.y2);
+        const x2 = Math.max(obj.x1, obj.x2);
+        const y2 = Math.max(obj.y1, obj.y2);
+        const cx = (obj.x1 + obj.x2) / 2;
+        const cy = (obj.y1 + obj.y2) / 2;
+        const width = Math.abs(obj.x2 - obj.x1);
+        const height = Math.abs(obj.y2 - obj.y1);
+        
+        switch (obj.shape) {
+            case 'rectangle':
+            case 'diamond':
+            case 'triangle':
+                // Simple bounding box check for these shapes
+                return x >= x1 - 5 && x <= x2 + 5 && y >= y1 - 5 && y <= y2 + 5;
+            
+            case 'circle':
+            case 'ellipse':
+                // Ellipse contains check
+                const rx = width / 2;
+                const ry = height / 2;
+                const dx = x - cx;
+                const dy = y - cy;
+                return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1.2; // 1.2 for tolerance
+            
+            case 'line':
+            case 'arrow':
+                // Distance from point to line
+                const distToLine = pointToLineDistance(x, y, obj.x1, obj.y1, obj.x2, obj.y2);
+                return distToLine <= 10; // 10 pixel tolerance
+            
+            case 'star':
+                // Simple bounding box check for star
+                return x >= x1 - 5 && x <= x2 + 5 && y >= y1 - 5 && y <= y2 + 5;
+            
+            default:
+                return false;
+        }
+    }
+    
+    // Distance from point to line segment
+    function pointToLineDistance(px, py, x1, y1, x2, y2) {
+        const A = px - x1;
+        const B = py - y1;
+        const C = x2 - x1;
+        const D = y2 - y1;
+        
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        
+        if (lenSq !== 0) {
+            param = dot / lenSq;
+        }
+        
+        let xx, yy;
+        
+        if (param < 0) {
+            xx = x1;
+            yy = y1;
+        } else if (param > 1) {
+            xx = x2;
+            yy = y2;
+        } else {
+            xx = x1 + param * C;
+            yy = y1 + param * D;
+        }
+        
+        const dx = px - xx;
+        const dy = py - yy;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+    
+    // Get text bounding box
+    function getTextBoundingBox(obj) {
+        // Approximate text dimensions
+        const charWidth = 14; // Approximate character width at 24px font
+        const lineHeight = 28;
+        return {
+            x: obj.x,
+            y: obj.y,
+            width: obj.text.length * charWidth,
+            height: lineHeight
+        };
+    }
+    
+    // Get resize handle at coordinates
+    function getResizeHandleAt(x, y, obj) {
+        if (!obj || obj.type !== 'shape') return null;
+        
+        const x1 = Math.min(obj.x1, obj.x2);
+        const y1 = Math.min(obj.y1, obj.y2);
+        const x2 = Math.max(obj.x1, obj.x2);
+        const y2 = Math.max(obj.y1, obj.y2);
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        const handleSize = 8;
+        
+        // Check corner handles
+        if (Math.abs(x - x1) <= handleSize && Math.abs(y - y1) <= handleSize) return 'nw';
+        if (Math.abs(x - x2) <= handleSize && Math.abs(y - y1) <= handleSize) return 'ne';
+        if (Math.abs(x - x1) <= handleSize && Math.abs(y - y2) <= handleSize) return 'sw';
+        if (Math.abs(x - x2) <= handleSize && Math.abs(y - y2) <= handleSize) return 'se';
+        
+        // Check edge handles
+        if (Math.abs(x - cx) <= handleSize && Math.abs(y - y1) <= handleSize) return 'n';
+        if (Math.abs(x - cx) <= handleSize && Math.abs(y - y2) <= handleSize) return 's';
+        if (Math.abs(x - x2) <= handleSize && Math.abs(y - cy) <= handleSize) return 'e';
+        if (Math.abs(x - x1) <= handleSize && Math.abs(y - cy) <= handleSize) return 'w';
+        
+        return null;
+    }
+    
+    // Redraw entire canvas with all objects
+    function redrawCanvas() {
+        // Clear main canvas
+        const dpr = window.devicePixelRatio || 1;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        ctx.restore();
+        applyDrawTransform();
+        
+        // Redraw all objects
+        state.objects.forEach(obj => {
+            if (obj.type === 'shape') {
+                drawShape(obj);
+            } else if (obj.type === 'text') {
+                drawText(obj);
+            }
+        });
+        
+        // Draw selection handles on overlay
+        if (state.selectedObject) {
+            drawSelectionHandles(state.selectedObject);
+        }
+    }
+    
+    // Draw a shape object
+    function drawShape(obj) {
+        const width = obj.x2 - obj.x1;
+        const height = obj.y2 - obj.y1;
+        
+        ctx.strokeStyle = obj.color;
+        ctx.lineWidth = obj.lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 1;
+        
+        if (obj.fill) {
+            ctx.fillStyle = obj.color;
+        }
+        
+        drawShapeGeometry(ctx, obj.x1, obj.y1, obj.x2, obj.y2, width, height, obj.shape, obj.fill);
+        
+        // Apply hand-drawn effect if enabled
+        if (obj.handDrawn) {
+            applyHandDrawnEffect(ctx, obj.x1, obj.y1, obj.x2, obj.y2, width, height, obj.shape);
+        }
+    }
+    
+    // Draw a text object
+    function drawText(obj) {
+        ctx.font = obj.font || '24px sans-serif';
+        ctx.fillStyle = obj.color;
+        ctx.textBaseline = 'top';
+        ctx.fillText(obj.text, obj.x, obj.y);
+    }
+    
+    // Draw selection handles
+    function drawSelectionHandles(obj) {
+        if (!obj || obj.type !== 'shape') return;
+        
+        // Clear overlay
+        const dpr = window.devicePixelRatio || 1;
+        overlayCtx.save();
+        overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.restore();
+        applyOverlayTransform();
+        
+        const x1 = Math.min(obj.x1, obj.x2);
+        const y1 = Math.min(obj.y1, obj.y2);
+        const x2 = Math.max(obj.x1, obj.x2);
+        const y2 = Math.max(obj.y1, obj.y2);
+        const cx = (x1 + x2) / 2;
+        const cy = (y1 + y2) / 2;
+        
+        // Draw bounding box
+        overlayCtx.strokeStyle = '#5a8dee';
+        overlayCtx.lineWidth = 2;
+        overlayCtx.setLineDash([5, 5]);
+        overlayCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        overlayCtx.setLineDash([]);
+        
+        // Draw handles
+        const handleSize = 8;
+        overlayCtx.fillStyle = '#ffffff';
+        overlayCtx.strokeStyle = '#5a8dee';
+        overlayCtx.lineWidth = 2;
+        
+        const handles = [
+            [x1, y1], [cx, y1], [x2, y1],
+            [x1, cy],           [x2, cy],
+            [x1, y2], [cx, y2], [x2, y2]
+        ];
+        
+        handles.forEach(([hx, hy]) => {
+            overlayCtx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+            overlayCtx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+        });
     }
 
     // ============================================
