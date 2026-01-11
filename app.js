@@ -66,6 +66,12 @@
     const SHAPE_HIT_TOLERANCE = 5; // Pixels of tolerance for shape boundary hit detection
     const LINE_HIT_TOLERANCE = 10; // Pixels of tolerance for line/arrow hit detection
     const ELLIPSE_HIT_TOLERANCE = 1.2; // Multiplier for ellipse hit detection (allows some margin)
+    const RESIZE_HANDLE_SIZE = 8; // Size of resize handles in pixels
+    const SELECTION_COLOR = '#5a8dee'; // Color for selection indicators and handles
+    
+    // Text estimation constants
+    const TEXT_CHAR_WIDTH = 14; // Approximate character width at 24px font
+    const TEXT_LINE_HEIGHT = 28; // Approximate line height at 24px font
 
     // Color utility functions
     const ColorUtils = {
@@ -1379,7 +1385,7 @@
     function restoreHistoryState(historyState) {
         // Handle old format (string) and new format (object)
         const dataUrl = typeof historyState === 'string' ? historyState : historyState.canvas;
-        const objects = typeof historyState === 'object' ? historyState.objects : [];
+        const objects = (typeof historyState === 'object' && historyState !== null) ? historyState.objects : [];
         
         const img = new Image();
         img.onload = function() {
@@ -2774,8 +2780,8 @@
             case 'circle':
             case 'ellipse':
                 // Ellipse contains check
-                const rx = width / 2;
-                const ry = height / 2;
+                const rx = Math.abs(width) / 2;
+                const ry = Math.abs(height) / 2;
                 const dx = x - cx;
                 const dy = y - cy;
                 return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= ELLIPSE_HIT_TOLERANCE;
@@ -2832,13 +2838,11 @@
     // Get text bounding box
     function getTextBoundingBox(obj) {
         // Approximate text dimensions
-        const charWidth = 14; // Approximate character width at 24px font
-        const lineHeight = 28;
         return {
             x: obj.x,
             y: obj.y,
-            width: obj.text.length * charWidth,
-            height: lineHeight
+            width: obj.text.length * TEXT_CHAR_WIDTH,
+            height: TEXT_LINE_HEIGHT
         };
     }
     
@@ -2852,19 +2856,18 @@
         const y2 = Math.max(obj.y1, obj.y2);
         const cx = (x1 + x2) / 2;
         const cy = (y1 + y2) / 2;
-        const handleSize = 8;
         
         // Check corner handles
-        if (Math.abs(x - x1) <= handleSize && Math.abs(y - y1) <= handleSize) return 'nw';
-        if (Math.abs(x - x2) <= handleSize && Math.abs(y - y1) <= handleSize) return 'ne';
-        if (Math.abs(x - x1) <= handleSize && Math.abs(y - y2) <= handleSize) return 'sw';
-        if (Math.abs(x - x2) <= handleSize && Math.abs(y - y2) <= handleSize) return 'se';
+        if (Math.abs(x - x1) <= RESIZE_HANDLE_SIZE && Math.abs(y - y1) <= RESIZE_HANDLE_SIZE) return 'nw';
+        if (Math.abs(x - x2) <= RESIZE_HANDLE_SIZE && Math.abs(y - y1) <= RESIZE_HANDLE_SIZE) return 'ne';
+        if (Math.abs(x - x1) <= RESIZE_HANDLE_SIZE && Math.abs(y - y2) <= RESIZE_HANDLE_SIZE) return 'sw';
+        if (Math.abs(x - x2) <= RESIZE_HANDLE_SIZE && Math.abs(y - y2) <= RESIZE_HANDLE_SIZE) return 'se';
         
         // Check edge handles
-        if (Math.abs(x - cx) <= handleSize && Math.abs(y - y1) <= handleSize) return 'n';
-        if (Math.abs(x - cx) <= handleSize && Math.abs(y - y2) <= handleSize) return 's';
-        if (Math.abs(x - x2) <= handleSize && Math.abs(y - cy) <= handleSize) return 'e';
-        if (Math.abs(x - x1) <= handleSize && Math.abs(y - cy) <= handleSize) return 'w';
+        if (Math.abs(x - cx) <= RESIZE_HANDLE_SIZE && Math.abs(y - y1) <= RESIZE_HANDLE_SIZE) return 'n';
+        if (Math.abs(x - cx) <= RESIZE_HANDLE_SIZE && Math.abs(y - y2) <= RESIZE_HANDLE_SIZE) return 's';
+        if (Math.abs(x - x2) <= RESIZE_HANDLE_SIZE && Math.abs(y - cy) <= RESIZE_HANDLE_SIZE) return 'e';
+        if (Math.abs(x - x1) <= RESIZE_HANDLE_SIZE && Math.abs(y - cy) <= RESIZE_HANDLE_SIZE) return 'w';
         
         return null;
     }
@@ -2945,16 +2948,15 @@
         const cy = (y1 + y2) / 2;
         
         // Draw bounding box
-        overlayCtx.strokeStyle = '#5a8dee';
+        overlayCtx.strokeStyle = SELECTION_COLOR;
         overlayCtx.lineWidth = 2;
         overlayCtx.setLineDash([5, 5]);
         overlayCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
         overlayCtx.setLineDash([]);
         
         // Draw handles
-        const handleSize = 8;
         overlayCtx.fillStyle = '#ffffff';
-        overlayCtx.strokeStyle = '#5a8dee';
+        overlayCtx.strokeStyle = SELECTION_COLOR;
         overlayCtx.lineWidth = 2;
         
         const handles = [
@@ -2964,8 +2966,8 @@
         ];
         
         handles.forEach(([hx, hy]) => {
-            overlayCtx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
-            overlayCtx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+            overlayCtx.fillRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+            overlayCtx.strokeRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
         });
     }
 
