@@ -144,7 +144,7 @@
     // DOM elements
     let bgCanvas, bgCtx, drawCanvas, ctx, canvasContainer;
     let overlayCanvas, overlayCtx;
-    let introOverlay, startBtn, sampleBtn, dontShowAgainCheckbox;
+    let introOverlay, introContent, startBtn, sampleBtn, dontShowAgainCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
     let hueShiftSlider, hueShiftValue;
     let brushTextureSelect, brushEraserToggle;
@@ -185,6 +185,7 @@
         canvasContainer = document.getElementById('canvas-container');
         toolStatus = document.getElementById('tool-status');
         introOverlay = document.getElementById('intro-overlay');
+        introContent = introOverlay.querySelector('.intro-content');
         startBtn = document.getElementById('start-drawing');
         sampleBtn = document.getElementById('sample-canvas');
         dontShowAgainCheckbox = document.getElementById('dont-show-again');
@@ -422,6 +423,18 @@
         startBtn.addEventListener('click', closeIntro);
         sampleBtn.addEventListener('click', openSampleCanvas);
         helpBtn.addEventListener('click', showIntro);
+        
+        // Close intro on backdrop click (clicking outside the modal content)
+        introOverlay.addEventListener('click', function(e) {
+            if (e.target === introOverlay) {
+                closeIntro();
+            }
+        });
+        
+        // Prevent clicks inside intro content from closing the overlay
+        introContent.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
 
         // Color selection
         colorSwatches.forEach(swatch => {
