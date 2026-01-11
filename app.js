@@ -431,9 +431,13 @@
             }
         });
         
-        // Prevent clicks inside intro content from closing the overlay
+        // Prevent clicks on non-button elements from closing the overlay
+        // But allow button clicks to propagate and work correctly
         introContent.addEventListener('click', function(e) {
-            e.stopPropagation();
+            // Only stop propagation if not clicking a button
+            if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                e.stopPropagation();
+            }
         });
 
         // Color selection
