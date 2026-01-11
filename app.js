@@ -61,6 +61,11 @@
     
     // UI Constants
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
+    
+    // Selection and hit detection constants
+    const SHAPE_HIT_TOLERANCE = 5; // Pixels of tolerance for shape boundary hit detection
+    const LINE_HIT_TOLERANCE = 10; // Pixels of tolerance for line/arrow hit detection
+    const ELLIPSE_HIT_TOLERANCE = 1.2; // Multiplier for ellipse hit detection (allows some margin)
 
     // Color utility functions
     const ColorUtils = {
@@ -1343,8 +1348,11 @@
         // Remove any states after current step
         state.history = state.history.slice(0, state.historyStep + 1);
         
-        // Add new state
-        state.history.push(drawCanvas.toDataURL());
+        // Add new state with both canvas and objects
+        state.history.push({
+            canvas: drawCanvas.toDataURL(),
+            objects: JSON.parse(JSON.stringify(state.objects)) // Deep clone
+        });
         
         // Limit history size
         if (state.history.length > state.maxHistory) {
@@ -1368,7 +1376,11 @@
         }
     }
 
-    function restoreHistoryState(dataUrl) {
+    function restoreHistoryState(historyState) {
+        // Handle old format (string) and new format (object)
+        const dataUrl = typeof historyState === 'string' ? historyState : historyState.canvas;
+        const objects = typeof historyState === 'object' ? historyState.objects : [];
+        
         const img = new Image();
         img.onload = function() {
             // Clear canvas and restore image in canvas pixel space
@@ -1386,6 +1398,20 @@
             
             // Reapply the current zoom/pan transform for future drawing
             applyDrawTransform();
+            
+            // Restore objects array
+            state.objects = objects;
+            
+            // Clear selection
+            state.selectedObject = null;
+            
+            // Clear overlay
+            const dpr2 = window.devicePixelRatio || 1;
+            overlayCtx.save();
+            overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.restore();
+            applyOverlayTransform();
         };
         img.src = dataUrl;
     }
@@ -1399,6 +1425,10 @@
             ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
             ctx.restore();
             applyDrawTransform();
+            
+            // Clear objects array
+            state.objects = [];
+            state.selectedObject = null;
             
             // Create sync event
             Sync.createClearEvent();
@@ -2738,7 +2768,8 @@
             case 'diamond':
             case 'triangle':
                 // Simple bounding box check for these shapes
-                return x >= x1 - 5 && x <= x2 + 5 && y >= y1 - 5 && y <= y2 + 5;
+                return x >= x1 - SHAPE_HIT_TOLERANCE && x <= x2 + SHAPE_HIT_TOLERANCE && 
+                       y >= y1 - SHAPE_HIT_TOLERANCE && y <= y2 + SHAPE_HIT_TOLERANCE;
             
             case 'circle':
             case 'ellipse':
@@ -2747,17 +2778,18 @@
                 const ry = height / 2;
                 const dx = x - cx;
                 const dy = y - cy;
-                return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1.2; // 1.2 for tolerance
+                return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= ELLIPSE_HIT_TOLERANCE;
             
             case 'line':
             case 'arrow':
                 // Distance from point to line
                 const distToLine = pointToLineDistance(x, y, obj.x1, obj.y1, obj.x2, obj.y2);
-                return distToLine <= 10; // 10 pixel tolerance
+                return distToLine <= LINE_HIT_TOLERANCE;
             
             case 'star':
                 // Simple bounding box check for star
-                return x >= x1 - 5 && x <= x2 + 5 && y >= y1 - 5 && y <= y2 + 5;
+                return x >= x1 - SHAPE_HIT_TOLERANCE && x <= x2 + SHAPE_HIT_TOLERANCE && 
+                       y >= y1 - SHAPE_HIT_TOLERANCE && y <= y2 + SHAPE_HIT_TOLERANCE;
             
             default:
                 return false;
