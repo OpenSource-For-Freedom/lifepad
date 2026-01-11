@@ -1384,8 +1384,9 @@
 
     function restoreHistoryState(historyState) {
         // Handle old format (string) and new format (object)
-        const dataUrl = typeof historyState === 'string' ? historyState : historyState.canvas;
-        const objects = (typeof historyState === 'object' && historyState !== null) ? historyState.objects : [];
+        // Check for null first to avoid typeof returning 'object' for null
+        const dataUrl = (historyState && typeof historyState === 'object') ? historyState.canvas : historyState;
+        const objects = (historyState && typeof historyState === 'object') ? historyState.objects : [];
         
         const img = new Image();
         img.onload = function() {
@@ -1405,8 +1406,8 @@
             // Reapply the current zoom/pan transform for future drawing
             applyDrawTransform();
             
-            // Restore objects array
-            state.objects = objects;
+            // Restore objects array with defensive copy
+            state.objects = Array.isArray(objects) ? [...objects] : [];
             
             // Clear selection
             state.selectedObject = null;
