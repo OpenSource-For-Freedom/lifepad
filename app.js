@@ -1558,7 +1558,7 @@
     function toggleMenu() {
         state.menuCollapsed = !state.menuCollapsed;
         document.getElementById('app').classList.toggle('menu-collapsed', state.menuCollapsed);
-        localStorage.setItem('lifepad-menu-collapsed', state.menuCollapsed);
+        localStorage.setItem('lifepad-menu-collapsed', state.menuCollapsed.toString());
     }
     
     // Zoom and pan functions
