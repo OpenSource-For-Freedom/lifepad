@@ -2684,6 +2684,12 @@
                 return;
             }
             
+            // Ensure we have a peer connection (offer must have been created)
+            if (!RTC.peerConnection) {
+                showCollabError('No active session - please create a fresh offer first');
+                return;
+            }
+            
             clearCollabError();
             applyAnswerBtn.disabled = true;
             applyAnswerBtn.textContent = 'Connecting...';
@@ -2691,6 +2697,7 @@
             
             await RTC.applyAnswer(answerBlobObj);
             
+            applyAnswerBtn.disabled = false;
             applyAnswerBtn.textContent = 'Applied';
             // Toast notification will be shown after handshake completes
             
