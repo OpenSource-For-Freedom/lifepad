@@ -286,7 +286,7 @@ html, body {
 
 /* Navbar collapsed state */
 .menu-collapsed .navbar {
-    transform: translateY(-100%);
+    transform: translateY(-200%);
     opacity: 0;
     pointer-events: none;
 }
