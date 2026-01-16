@@ -2697,6 +2697,7 @@
             
             await RTC.applyAnswer(answerBlobObj);
             
+            applyAnswerBtn.disabled = false;
             applyAnswerBtn.textContent = 'Applied';
             // Toast notification will be shown after handshake completes
             
