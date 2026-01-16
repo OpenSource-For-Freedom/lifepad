@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-lifePAD is a Progressive Web App (PWA) for sketching, drawing, and diagramming. It is designed as a privacy-focused, offline-first alternative to tools like Excalidraw.
+lifePAD is a Progressive Web App (PWA) for sketching, drawing, and diagramming. Created in memory of Shirley Parrish to promote creativity and artistic expression, it is designed as a privacy-focused, offline-first drawing and design tool.
 
 ### Core Technologies
 - **Pure vanilla JavaScript** (ES6+) - NO frameworks, NO build tools
