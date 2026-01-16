@@ -291,6 +291,11 @@ html, body {
     pointer-events: none;
 }
 
+/* Canvas container collapsed state */
+.menu-collapsed #canvas-container {
+    display: none;
+}
+
 .nav-section {
     display: flex;
     align-items: center;
