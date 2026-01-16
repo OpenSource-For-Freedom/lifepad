@@ -270,18 +270,18 @@ Once you've loaded lifePAD at least once:
 
 ### A Tool for Creativity and Design
 lifePAD is built to promote creativity and artistic expression:
-- 🎨 **Express yourself freely**: Multiple brush textures for artistic expression
-- ✏️ **Hand-drawn aesthetic**: Create diagrams with a natural, sketch-like feel
-- 🖌️ **Pressure-sensitive stylus support**: Perfect for tablets and digital artists
-- 📐 **Versatile shapes**: Rich library for both technical diagrams and creative designs
-- ✨ **Text annotations**: Label and annotate your creations
-- 💾 **Export flexibility**: Save as PNG or SVG for any use
-- 🤝 **Collaborate in real-time**: Share creativity with others
-- 🔒 **Privacy-focused**: Your art stays yours, with end-to-end encryption
-- 📱 **Offline-first PWA**: Create anywhere, anytime
-- 🆓 **No accounts required**: Just open and start creating
-- 🌙 **Built-in dark mode**: Easy on the eyes during late-night creative sessions
-- 🌍 **Open source and free**: Built for the community
+- **Express yourself freely**: Multiple brush textures for artistic expression
+- **Hand-drawn aesthetic**: Create diagrams with a natural, sketch-like feel
+- **Pressure-sensitive stylus support**: Perfect for tablets and digital artists
+- **Versatile shapes**: Rich library for both technical diagrams and creative designs
+- **Text annotations**: Label and annotate your creations
+- **Export flexibility**: Save as PNG or SVG for any use
+- **Collaborate in real-time**: Share creativity with others
+- **Privacy-focused**: Your art stays yours, with end-to-end encryption
+- **Offline-first PWA**: Create anywhere, anytime
+- **No accounts required**: Just open and start creating
+- **Built-in dark mode**: Easy on the eyes during late-night creative sessions
+- **Open source and free**: Built for the community
 
 ## Privacy and Data
 
