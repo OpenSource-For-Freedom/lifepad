@@ -2,18 +2,20 @@
 
 Primary Artistry Device - A simple, mobile-first sketch pad that works with touch and stylus.
 
+**In Memory of Shirley Parrish** - This app is dedicated to Shirley Parrish, who taught the creator how to paint, draw, and be creative. Her passion for art and design inspired this tool to promote creativity and help others express their artistic vision.
+
 https://opensource-for-freedom.github.io/lifepad/
 
 ## What is lifePAD?
 
-lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing and diagramming experience. Designed to compete with tools like Excalidraw, it works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, diagrams, note-taking, brainstorming, or artistic expression on the go.
+lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing and diagramming experience. It works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, diagrams, note-taking, brainstorming, or artistic expression on the go.
 
 ## Features
 
 ### Drawing & Diagramming Tools
 - **Multiple brush textures**: Ink, Pencil, Marker, Spray, and Charcoal
 - **Rich shape library**: Rectangle, Circle, Line, Triangle, Arrow, Star, Diamond, Ellipse
-- **Hand-drawn style**: Optional rough/sketch aesthetic for shapes (Excalidraw-like)
+- **Hand-drawn style**: Optional rough/sketch aesthetic for shapes
 - **Text tool**: Add labels and annotations to your drawings
 - **Selection tool**: Select and manipulate objects (coming soon: move, resize, rotate)
 - Touch and stylus optimized with pressure sensitivity support
@@ -266,22 +268,20 @@ Once you've loaded lifePAD at least once:
 
 ## Why Choose lifePAD?
 
-### Excalidraw Alternative
-lifePAD offers many of the features that make Excalidraw popular:
-- ✅ Hand-drawn/sketch aesthetic for diagrams
-- ✅ Rich shape library with customizable styles
-- ✅ Text annotations
-- ✅ Export to PNG and SVG
-- ✅ Real-time collaboration
-- ✅ Offline-first PWA
-- ✅ No accounts required
-- ✅ Privacy-focused with encryption
-- ✅ Open source and free
-
-**Plus unique features:**
-- 🎨 Natural brush textures (Pencil, Marker, Spray, Charcoal) for artistic expression
-- 🖌️ Pressure-sensitive stylus support for tablets
-- 🎨 Built-in dark mode
+### A Tool for Creativity and Design
+lifePAD is built to promote creativity and artistic expression:
+- 🎨 **Express yourself freely**: Multiple brush textures for artistic expression
+- ✏️ **Hand-drawn aesthetic**: Create diagrams with a natural, sketch-like feel
+- 🖌️ **Pressure-sensitive stylus support**: Perfect for tablets and digital artists
+- 📐 **Versatile shapes**: Rich library for both technical diagrams and creative designs
+- ✨ **Text annotations**: Label and annotate your creations
+- 💾 **Export flexibility**: Save as PNG or SVG for any use
+- 🤝 **Collaborate in real-time**: Share creativity with others
+- 🔒 **Privacy-focused**: Your art stays yours, with end-to-end encryption
+- 📱 **Offline-first PWA**: Create anywhere, anytime
+- 🆓 **No accounts required**: Just open and start creating
+- 🌙 **Built-in dark mode**: Easy on the eyes during late-night creative sessions
+- 🌍 **Open source and free**: Built for the community
 
 ## Privacy and Data
 
@@ -331,4 +331,6 @@ This project is open source and available under the MIT License.
 
 ## Credits
 
-Created for freedom-focused open source initiatives. Built with accessibility and privacy in mind.
+**In Memory of Shirley Parrish** - This app is dedicated to Shirley Parrish, who inspired a love of painting, drawing, and creativity in the creator. Her legacy lives on through this tool that helps others explore their artistic vision.
+
+Created for freedom-focused open source initiatives. Built with accessibility, privacy, and creativity in mind.
