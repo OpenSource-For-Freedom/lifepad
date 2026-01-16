@@ -326,6 +326,32 @@
         </div>
     </div>
 
+    <!-- Connection Success Modal -->
+    <div id="connection-success-modal" class="modal-overlay hidden">
+        <div class="modal-content connection-success">
+            <div class="modal-header">
+                <h2>🎉 Successfully Connected!</h2>
+            </div>
+            <div class="modal-body">
+                <div class="connection-names">
+                    <div class="name-item">
+                        <span class="name-label">You are:</span>
+                        <span id="local-name-display" class="name-value"></span>
+                    </div>
+                    <div class="connection-arrow">↔</div>
+                    <div class="name-item">
+                        <span class="name-label">Connected to:</span>
+                        <span id="remote-name-display" class="name-value"></span>
+                    </div>
+                </div>
+                <p class="connection-message">You can now see each other's cursors and collaborate in real-time!</p>
+            </div>
+            <div class="modal-footer">
+                <button id="close-connection-success" class="primary-btn">Start Collaborating</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>

@@ -196,6 +196,8 @@
     let answerBlobInput, answerInput, applyAnswerBtn;
     let joinPassphrase, offerBlobInput, createAnswerBtn, answerBlob, answerOutput, copyAnswerBtn;
     let disconnectBtn;
+    // Connection success modal elements
+    let connectionSuccessModal, closeConnectionSuccess, localNameDisplay, remoteNameDisplay;
 
     // Initialize app
     function init() {
@@ -300,6 +302,12 @@
         // Tab buttons don't have IDs, select by class and data attribute
         hostTabBtn = document.querySelector('.tab-btn[data-tab="host"]');
         joinTabBtn = document.querySelector('.tab-btn[data-tab="join"]');
+        
+        // Connection success modal elements
+        connectionSuccessModal = document.getElementById('connection-success-modal');
+        closeConnectionSuccess = document.getElementById('close-connection-success');
+        localNameDisplay = document.getElementById('local-name-display');
+        remoteNameDisplay = document.getElementById('remote-name-display');
 
         // Setup canvas
         setupCanvas();
@@ -591,6 +599,9 @@
         // PWA install
         installBtn.addEventListener('click', handleInstallClick);
         closeIosInstall.addEventListener('click', closeIosInstallModal);
+        
+        // Connection success modal
+        closeConnectionSuccess.addEventListener('click', closeConnectionSuccessModal);
 
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
@@ -1023,6 +1034,9 @@
 
     function draw(e) {
         e.preventDefault();
+        
+        // Send cursor position to peer (throttled)
+        sendCursorUpdate(e);
         
         // Only handle the tracked pointer
         if (state.currentPointerId !== e.pointerId) {
@@ -2452,6 +2466,113 @@
     function closeIosInstallModal() {
         iosInstallModal.classList.add('hidden');
     }
+    
+    // ============================================
+    // CONNECTION SUCCESS MODAL
+    // ============================================
+    
+    function showConnectionSuccessModal(localName, remoteName) {
+        localNameDisplay.textContent = localName;
+        remoteNameDisplay.textContent = remoteName;
+        connectionSuccessModal.classList.remove('hidden');
+    }
+    
+    function closeConnectionSuccessModal() {
+        connectionSuccessModal.classList.add('hidden');
+    }
+    
+    // ============================================
+    // REMOTE CURSOR RENDERING
+    // ============================================
+    
+    // Throttle cursor updates to avoid flooding the network
+    let lastCursorSendTime = 0;
+    const CURSOR_SEND_INTERVAL = 50; // ms
+    
+    function sendCursorUpdate(e) {
+        if (!RTC.handshakeComplete) return;
+        
+        const now = Date.now();
+        if (now - lastCursorSendTime < CURSOR_SEND_INTERVAL) return;
+        lastCursorSendTime = now;
+        
+        const rect = drawCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        RTC.sendCursor(x, y);
+    }
+    
+    function drawRemoteCursor() {
+        if (!RTC.remoteCursor.visible || !RTC.handshakeComplete) return;
+        
+        // Clear and redraw overlay
+        const dpr = window.devicePixelRatio || 1;
+        overlayCtx.save();
+        overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.restore();
+        applyOverlayTransform();
+        
+        // Redraw selection handles if present
+        if (state.selectedObject) {
+            drawSelectionHandles(state.selectedObject);
+        }
+        
+        // Convert screen coordinates to world coordinates
+        const world = screenToWorld(RTC.remoteCursor.x, RTC.remoteCursor.y);
+        
+        // Draw cursor
+        overlayCtx.save();
+        overlayCtx.strokeStyle = '#ff6b6b';
+        overlayCtx.fillStyle = '#ff6b6b';
+        overlayCtx.lineWidth = 2;
+        overlayCtx.lineCap = 'round';
+        overlayCtx.lineJoin = 'round';
+        
+        // Draw cursor pointer
+        overlayCtx.beginPath();
+        overlayCtx.moveTo(world.x, world.y);
+        overlayCtx.lineTo(world.x + 12, world.y + 16);
+        overlayCtx.lineTo(world.x + 7, world.y + 12);
+        overlayCtx.lineTo(world.x, world.y + 12);
+        overlayCtx.closePath();
+        overlayCtx.fill();
+        overlayCtx.stroke();
+        
+        // Draw name label
+        if (RTC.remoteName) {
+            overlayCtx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif';
+            overlayCtx.fillStyle = '#ffffff';
+            overlayCtx.strokeStyle = '#ff6b6b';
+            overlayCtx.lineWidth = 3;
+            
+            const textX = world.x + 15;
+            const textY = world.y + 20;
+            
+            overlayCtx.strokeText(RTC.remoteName, textX, textY);
+            overlayCtx.fillText(RTC.remoteName, textX, textY);
+        }
+        
+        overlayCtx.restore();
+    }
+    
+    function clearRemoteCursor() {
+        RTC.remoteCursor.visible = false;
+        
+        // Clear overlay
+        const dpr = window.devicePixelRatio || 1;
+        overlayCtx.save();
+        overlayCtx.setTransform(1, 0, 0, 1, 0, 0);
+        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        overlayCtx.restore();
+        applyOverlayTransform();
+        
+        // Redraw selection handles if present
+        if (state.selectedObject) {
+            drawSelectionHandles(state.selectedObject);
+        }
+    }
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
@@ -3078,6 +3199,40 @@
     };
 
     // ============================================
+    // NAME GENERATOR - Random farm/outdoor names
+    // ============================================
+    
+    const NameGenerator = {
+        adjectives: [
+            'Gentle', 'Sunny', 'Misty', 'Golden', 'Peaceful',
+            'Rolling', 'Mossy', 'Whispering', 'Bright', 'Clear',
+            'Rustic', 'Starry', 'Mountain', 'Valley', 'Creek',
+            'Pine', 'Oak', 'Willow', 'Meadow', 'Forest',
+            'Spring', 'Summer', 'Autumn', 'Winter', 'Morning',
+            'Evening', 'Highland', 'Lowland', 'Ridge', 'Creek'
+        ],
+        nouns: [
+            'Farm', 'Barn', 'Creek', 'Ridge', 'Valley',
+            'Meadow', 'Field', 'Hollow', 'Brook', 'Stream',
+            'Mountain', 'Hill', 'Forest', 'Woods', 'Trail',
+            'Pasture', 'Garden', 'Orchard', 'Grove', 'Glade',
+            'Cabin', 'Homestead', 'Ranch', 'Cottage', 'Cove',
+            'Pond', 'Lake', 'River', 'Spring', 'Falls',
+            'Oak', 'Pine', 'Maple', 'Birch', 'Cedar',
+            'Bear', 'Deer', 'Fox', 'Hawk', 'Dove',
+            'Rabbit', 'Squirrel', 'Turkey', 'Goose', 'Duck',
+            'Cow', 'Horse', 'Sheep', 'Goat', 'Chicken',
+            'Bee', 'Butterfly', 'Dragonfly', 'Firefly', 'Cricket'
+        ],
+        
+        generateName() {
+            const adj = this.adjectives[Math.floor(Math.random() * this.adjectives.length)];
+            const noun = this.nouns[Math.floor(Math.random() * this.nouns.length)];
+            return `${adj} ${noun}`;
+        }
+    };
+    
+    // ============================================
     // RTC MODULE - WebRTC connection and signaling
     // ============================================
     
@@ -3088,6 +3243,9 @@
         encryptionKey: null,
         salt: null,
         handshakeComplete: false,
+        localName: null,
+        remoteName: null,
+        remoteCursor: { x: 0, y: 0, visible: false },
         
         // Configuration constants
         ICE_GATHERING_TIMEOUT: 30000, // 30 seconds
@@ -3258,11 +3416,17 @@
         
         // Send encrypted handshake
         async sendHandshake() {
+            // Generate local name if not already set
+            if (!this.localName) {
+                this.localName = NameGenerator.generateName();
+            }
+            
             const nonce = Crypto.arrayBufferToBase64(Crypto.generateRandomBytes(16));
             const handshake = {
                 kind: 'hello',
                 nonce: nonce,
-                time: Date.now()
+                time: Date.now(),
+                name: this.localName
             };
             
             await this.sendEncrypted(handshake);
@@ -3292,6 +3456,8 @@
                     Sync.handleSnapshot(message);
                 } else if (message.kind === 'draw_event') {
                     Sync.handleDrawEvent(message);
+                } else if (message.kind === 'cursor') {
+                    this.handleCursorUpdate(message);
                 }
                 
             } catch (error) {
@@ -3304,17 +3470,32 @@
         // Complete handshake and notify user
         completeHandshake() {
             this.handshakeComplete = true;
-            updateCollabStatus('Connected with peer');
+            updateCollabStatus(`Connected to ${this.remoteName || 'Peer'}`);
             closeCollabModalFn();
-            showToast('Connection established! You are now collaborating.');
+            
+            // Show success modal with both names
+            const localNameDisplay = this.localName || 'You';
+            const remoteNameDisplay = this.remoteName || 'Partner';
+            
+            // Create and show success notification
+            showConnectionSuccessModal(localNameDisplay, remoteNameDisplay);
         },
         
         // Handle hello handshake
         async handleHello(message) {
-            // Send ack back
+            // Capture remote name
+            this.remoteName = message.name || 'Partner';
+            
+            // Generate local name if not set
+            if (!this.localName) {
+                this.localName = NameGenerator.generateName();
+            }
+            
+            // Send ack back with local name
             const ack = {
                 kind: 'hello_ack',
-                nonce: message.nonce
+                nonce: message.nonce,
+                name: this.localName
             };
             
             await this.sendEncrypted(ack);
@@ -3330,6 +3511,9 @@
         
         // Handle hello ack
         async handleHelloAck(message) {
+            // Capture remote name
+            this.remoteName = message.name || 'Partner';
+            
             // Complete handshake
             this.completeHandshake();
         },
@@ -3352,6 +3536,41 @@
             this.dataChannel.send(JSON.stringify(envelope));
         },
         
+        // Send cursor position
+        async sendCursor(x, y) {
+            if (!this.handshakeComplete) return;
+            
+            // Normalize cursor position
+            const rect = drawCanvas.getBoundingClientRect();
+            const nx = x / rect.width;
+            const ny = y / rect.height;
+            
+            const cursorEvent = {
+                kind: 'cursor',
+                x: nx,
+                y: ny,
+                t: Date.now()
+            };
+            
+            try {
+                await this.sendEncrypted(cursorEvent);
+            } catch (error) {
+                console.error('Failed to send cursor:', error);
+            }
+        },
+        
+        // Handle cursor update from peer
+        handleCursorUpdate(message) {
+            // Denormalize cursor position
+            const rect = drawCanvas.getBoundingClientRect();
+            this.remoteCursor.x = message.x * rect.width;
+            this.remoteCursor.y = message.y * rect.height;
+            this.remoteCursor.visible = true;
+            
+            // Trigger cursor render
+            drawRemoteCursor();
+        },
+        
         // Disconnect
         disconnect() {
             if (this.dataChannel) {
@@ -3368,8 +3587,14 @@
             this.encryptionKey = null;
             this.salt = null;
             this.handshakeComplete = false;
+            this.localName = null;
+            this.remoteName = null;
+            this.remoteCursor = { x: 0, y: 0, visible: false };
             
             updateCollabStatus('Disconnected');
+            
+            // Clear remote cursor
+            clearRemoteCursor();
         },
         
         // Handle disconnect
