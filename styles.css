@@ -804,6 +804,73 @@ html, body {
     color: #cccccc;
 }
 
+/* Connection Success Modal */
+.connection-success {
+    max-width: 500px;
+    text-align: center;
+}
+
+.connection-success .modal-header {
+    justify-content: center;
+    border-bottom: none;
+    padding-bottom: 10px;
+}
+
+.connection-names {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    margin: 20px 0;
+    padding: 20px;
+    background: var(--bg-primary);
+    border-radius: 12px;
+    gap: 15px;
+}
+
+.name-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.name-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.name-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 2px solid var(--border-color);
+}
+
+.connection-arrow {
+    font-size: 24px;
+    color: var(--text-secondary);
+}
+
+.connection-message {
+    margin: 16px 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
 /* High contrast improvements for accessibility */
 @media (prefers-contrast: high) {
     :root {
