@@ -56,7 +56,9 @@
         maxZoom: 1.7,        // Maximum zoom (170%)
         // Background image state
         bgImage: null,       // Loaded background image
-        bgImageLoaded: false
+        bgImageLoaded: false,
+        // Menu state
+        menuCollapsed: false // Whether the navbar is collapsed
     };
     
     // UI Constants
@@ -189,6 +191,8 @@
     let panToolBtn;
     // Background image input
     let bgImageInput;
+    // Menu toggle element
+    let menuToggleBtn;
     // Collaboration elements
     let collabBtn, collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
@@ -308,6 +312,9 @@
         closeConnectionSuccess = document.getElementById('close-connection-success');
         localNameDisplay = document.getElementById('local-name-display');
         remoteNameDisplay = document.getElementById('remote-name-display');
+        
+        // Menu toggle element
+        menuToggleBtn = document.getElementById('menu-toggle');
 
         // Setup canvas
         setupCanvas();
@@ -599,6 +606,9 @@
         // PWA install
         installBtn.addEventListener('click', handleInstallClick);
         closeIosInstall.addEventListener('click', closeIosInstallModal);
+        
+        // Menu toggle
+        menuToggleBtn.addEventListener('click', toggleMenu);
         
         // Connection success modal
         closeConnectionSuccess.addEventListener('click', closeConnectionSuccessModal);
@@ -1545,6 +1555,12 @@
         localStorage.setItem('lifepad-paper-mode', state.paperMode);
     }
     
+    function toggleMenu() {
+        state.menuCollapsed = !state.menuCollapsed;
+        document.getElementById('app').classList.toggle('menu-collapsed', state.menuCollapsed);
+        localStorage.setItem('lifepad-menu-collapsed', state.menuCollapsed.toString());
+    }
+    
     // Zoom and pan functions
     function zoomIn() {
         const rect = drawCanvas.getBoundingClientRect();
@@ -1661,6 +1677,13 @@
                 updateCurrentColor();
                 updateColorSwatchesDisplay();
             }
+        }
+        
+        // Load menu collapsed state
+        const savedMenuCollapsed = localStorage.getItem('lifepad-menu-collapsed');
+        if (savedMenuCollapsed === 'true') {
+            state.menuCollapsed = true;
+            document.getElementById('app').classList.add('menu-collapsed');
         }
         
         // Load canvas
