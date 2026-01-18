@@ -289,6 +289,7 @@ html, body {
     transform: translateY(-200%);
     opacity: 0;
     pointer-events: none;
+    display: none;
 }
 
 .nav-section {
