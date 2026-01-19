@@ -10,6 +10,8 @@ https://opensource-for-freedom.github.io/lifepad/
 
 lifePAD is a Progressive Web App (PWA) that provides a clean, distraction-free drawing and diagramming experience. It works completely offline, requires no account or login, and keeps all your work on your device. Perfect for quick sketches, diagrams, note-taking, brainstorming, or artistic expression on the go.
 
+**💡 Works best on a tablet with a stylus** - While lifePAD works on any device, the optimal experience is on a tablet with stylus support. The pressure-sensitive drawing capabilities and larger canvas make tablets ideal for creative work.
+
 ## Features
 
 ### Drawing & Diagramming Tools
@@ -272,7 +274,7 @@ Once you've loaded lifePAD at least once:
 lifePAD is built to promote creativity and artistic expression:
 - **Express yourself freely**: Multiple brush textures for artistic expression
 - **Hand-drawn aesthetic**: Create diagrams with a natural, sketch-like feel
-- **Pressure-sensitive stylus support**: Perfect for tablets and digital artists
+- **Optimized for tablets with stylus**: Pressure-sensitive drawing works best on tablets with stylus support (also works with touch and mouse)
 - **Versatile shapes**: Rich library for both technical diagrams and creative designs
 - **Text annotations**: Label and annotate your creations
 - **Export flexibility**: Save as PNG or SVG for any use
