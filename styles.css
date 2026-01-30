@@ -484,6 +484,9 @@ html, body {
     overflow: hidden;
     background: var(--canvas-bg);
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 
 /* Background canvas - bottom layer */
@@ -493,6 +496,9 @@ html, body {
     top: 0;
     left: 0;
     touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     z-index: 1;
 }
 
@@ -504,6 +510,9 @@ html, body {
     left: 0;
     touch-action: none;
     cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     z-index: 2;
 }
 
@@ -515,6 +524,9 @@ html, body {
     left: 0;
     touch-action: none;
     pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     z-index: 5;
 }
 
