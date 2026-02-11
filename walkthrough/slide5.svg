@@ -17,5 +17,5 @@
   <path d="M 200 170 L 200 200 L 220 190" stroke="#5a8dee" stroke-width="3" fill="none"/>
   
   <!-- Text -->
-  <text x="200" y="270" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Toggle themes and works offline</text>
+  <text x="200" y="270" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Toggle themes and work offline</text>
 </svg>
