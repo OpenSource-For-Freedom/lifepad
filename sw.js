@@ -1,7 +1,7 @@
 // Service Worker for lifePAD
 // Provides offline functionality and caching
 
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `lifepad-cache-${CACHE_VERSION}`;
 
 // Files to cache for offline use
@@ -11,7 +11,13 @@ const STATIC_ASSETS = [
     './styles.css',
     './app.js',
     './manifest.webmanifest',
-    './icons/lifepad.PNG'
+    './icons/lifepad.PNG',
+    './walkthrough/slide1.svg',
+    './walkthrough/slide2.svg',
+    './walkthrough/slide3.svg',
+    './walkthrough/slide4.svg',
+    './walkthrough/slide5.svg',
+    './walkthrough/slide6.svg'
 ];
 
 // Install event - cache static assets
@@ -96,9 +102,11 @@ self.addEventListener('fetch', event => {
                         
                         // Cache new responses for static assets
                         if (event.request.url.includes('/icons/') || 
+                            event.request.url.includes('/walkthrough/') ||
                             event.request.url.includes('favicon.png') ||
                             event.request.url.endsWith('.css') ||
                             event.request.url.endsWith('.js') ||
+                            event.request.url.endsWith('.svg') ||
                             event.request.url.endsWith('.webmanifest')) {
                             caches.open(CACHE_NAME)
                                 .then(cache => {

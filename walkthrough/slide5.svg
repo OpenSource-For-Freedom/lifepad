@@ -1,0 +1,21 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f5f5f5"/>
+  
+  <!-- Canvas in light mode -->
+  <rect x="50" y="60" width="140" height="100" fill="white" stroke="#333" stroke-width="2"/>
+  <text x="120" y="100" font-family="Arial, sans-serif" font-size="12" fill="#333" text-anchor="middle">Light Mode</text>
+  <circle cx="70" cy="80" r="5" fill="#ffcc44"/>
+  
+  <!-- Canvas in dark mode -->
+  <rect x="210" y="60" width="140" height="100" fill="#2c2c2c" stroke="#666" stroke-width="2"/>
+  <text x="280" y="100" font-family="Arial, sans-serif" font-size="12" fill="#ccc" text-anchor="middle">Dark Mode</text>
+  <circle cx="230" cy="80" r="5" fill="#4488ff"/>
+  
+  <!-- Offline icon -->
+  <circle cx="200" cy="200" r="30" fill="none" stroke="#5a8dee" stroke-width="3"/>
+  <path d="M 200 170 L 200 200 L 220 190" stroke="#5a8dee" stroke-width="3" fill="none"/>
+  
+  <!-- Text -->
+  <text x="200" y="270" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Toggle themes and work offline</text>
+</svg>

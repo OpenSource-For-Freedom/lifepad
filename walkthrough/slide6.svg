@@ -1,0 +1,27 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f5f5f5"/>
+  
+  <!-- Two devices collaborating -->
+  <rect x="60" y="60" width="120" height="100" fill="white" stroke="#333" stroke-width="2" rx="8"/>
+  <circle cx="120" cy="95" r="8" fill="#ff4444"/>
+  <text x="120" y="130" font-family="Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle">Device 1</text>
+  
+  <rect x="220" y="60" width="120" height="100" fill="white" stroke="#333" stroke-width="2" rx="8"/>
+  <circle cx="280" cy="95" r="8" fill="#ff4444"/>
+  <text x="280" y="130" font-family="Arial, sans-serif" font-size="10" fill="#333" text-anchor="middle">Device 2</text>
+  
+  <!-- Connection line -->
+  <line x1="180" y1="110" x2="220" y2="110" stroke="#5a8dee" stroke-width="2" stroke-dasharray="5,5"/>
+  <polygon points="215,105 220,110 215,115" fill="#5a8dee"/>
+  <polygon points="185,105 180,110 185,115" fill="#5a8dee"/>
+  
+  <!-- Lock icon for encryption -->
+  <rect x="190" y="105" width="20" height="15" fill="#44cc44" rx="2"/>
+  <path d="M 195 105 L 195 100 Q 195 95 200 95 Q 205 95 205 100 L 205 105" stroke="#44cc44" stroke-width="2" fill="none"/>
+  
+  <!-- Text -->
+  <text x="200" y="195" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Real-time collaboration with</text>
+  <text x="200" y="215" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">end-to-end encryption</text>
+  <text x="200" y="270" font-family="Arial, sans-serif" font-size="12" fill="#666" text-anchor="middle">Click Collab button to start</text>
+</svg>

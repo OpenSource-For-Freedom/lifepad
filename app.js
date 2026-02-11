@@ -170,7 +170,8 @@
     // DOM elements
     let bgCanvas, bgCtx, drawCanvas, ctx, canvasContainer;
     let overlayCanvas, overlayCtx;
-    let introOverlay, introContent, startBtn, sampleBtn, dontShowAgainCheckbox;
+    let walkthroughModal, closeWalkthroughBtn, walkthroughPrevBtn, walkthroughNextBtn;
+    let walkthroughDots, walkthroughSlides, dontShowWalkthroughCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
     let hueShiftSlider, hueShiftValue;
     let brushTextureSelect, brushEraserToggle;
@@ -214,11 +215,13 @@
         overlayCtx = overlayCanvas.getContext('2d', { willReadFrequently: false });
         canvasContainer = document.getElementById('canvas-container');
         toolStatus = document.getElementById('tool-status');
-        introOverlay = document.getElementById('intro-overlay');
-        introContent = introOverlay.querySelector('.intro-content');
-        startBtn = document.getElementById('start-drawing');
-        sampleBtn = document.getElementById('sample-canvas');
-        dontShowAgainCheckbox = document.getElementById('dont-show-again');
+        walkthroughModal = document.getElementById('walkthrough-modal');
+        closeWalkthroughBtn = document.getElementById('close-walkthrough');
+        walkthroughPrevBtn = document.getElementById('walkthrough-prev');
+        walkthroughNextBtn = document.getElementById('walkthrough-next');
+        walkthroughDots = document.querySelectorAll('.walkthrough-dot');
+        walkthroughSlides = document.querySelectorAll('.walkthrough-slide');
+        dontShowWalkthroughCheckbox = document.getElementById('dont-show-walkthrough');
         customColorPicker = document.getElementById('custom-color');
         penSizeSlider = document.getElementById('pen-size');
         penSizeValue = document.getElementById('pen-size-value');
@@ -328,8 +331,8 @@
         // Setup event listeners
         setupEventListeners();
         
-        // Check intro preference
-        checkIntroPreference();
+        // Check walkthrough preference
+        checkWalkthroughPreference();
         
         // Register service worker
         registerServiceWorker();
@@ -458,24 +461,23 @@
 
     // Event listeners setup
     function setupEventListeners() {
-        // Intro overlay
-        startBtn.addEventListener('click', closeIntro);
-        sampleBtn.addEventListener('click', openSampleCanvas);
-        helpBtn.addEventListener('click', showIntro);
+        // Walkthrough modal
+        closeWalkthroughBtn.addEventListener('click', closeWalkthrough);
+        walkthroughPrevBtn.addEventListener('click', prevWalkthroughSlide);
+        walkthroughNextBtn.addEventListener('click', nextWalkthroughSlide);
         
-        // Close intro on backdrop click (clicking outside the modal content)
-        introOverlay.addEventListener('click', function(e) {
-            if (e.target === introOverlay) {
-                closeIntro();
-            }
+        // Walkthrough dots navigation
+        walkthroughDots.forEach((dot, index) => {
+            dot.addEventListener('click', () => goToWalkthroughSlide(index));
         });
         
-        // Prevent clicks on non-button elements from closing the overlay
-        // But allow button clicks to propagate and work correctly
-        introContent.addEventListener('click', function(e) {
-            // Only stop propagation if not clicking a button
-            if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
-                e.stopPropagation();
+        // Help button to show walkthrough
+        helpBtn.addEventListener('click', showWalkthrough);
+        
+        // Close walkthrough on backdrop click
+        walkthroughModal.addEventListener('click', function(e) {
+            if (e.target === walkthroughModal) {
+                closeWalkthrough();
             }
         });
 
@@ -1690,48 +1692,72 @@
         loadCanvasFromStorage();
     }
 
-    // Intro overlay
-    function checkIntroPreference() {
-        const dontShow = localStorage.getItem('lifepad-no-intro');
+    // Walkthrough modal functions
+    let currentWalkthroughSlide = 0;
+    const totalWalkthroughSlides = 7;
+    
+    function checkWalkthroughPreference() {
+        const dontShow = localStorage.getItem('lifepad-no-walkthrough');
         if (dontShow === 'true') {
-            closeIntro();
+            closeWalkthrough();
         }
     }
 
-    function showIntro() {
-        introOverlay.classList.remove('hidden');
+    function showWalkthrough() {
+        walkthroughModal.classList.remove('hidden');
+        goToWalkthroughSlide(0);
     }
 
-    function closeIntro() {
-        if (dontShowAgainCheckbox.checked) {
-            localStorage.setItem('lifepad-no-intro', 'true');
+    function closeWalkthrough() {
+        if (dontShowWalkthroughCheckbox.checked) {
+            localStorage.setItem('lifepad-no-walkthrough', 'true');
         }
-        introOverlay.classList.add('hidden');
+        walkthroughModal.classList.add('hidden');
     }
-
-    function openSampleCanvas() {
-        // Draw a sample stroke
-        ctx.strokeStyle = '#5a8dee';
-        ctx.lineWidth = 4;
-        ctx.lineCap = 'round';
-        ctx.globalAlpha = 1;
+    
+    function goToWalkthroughSlide(index) {
+        currentWalkthroughSlide = index;
         
-        const centerX = drawCanvas.width / (window.devicePixelRatio || 1) / 2;
-        const centerY = drawCanvas.height / (window.devicePixelRatio || 1) / 2;
+        // Update slides
+        walkthroughSlides.forEach((slide, i) => {
+            if (i === index) {
+                slide.classList.add('active');
+            } else {
+                slide.classList.remove('active');
+            }
+        });
         
-        ctx.beginPath();
-        ctx.moveTo(centerX - 100, centerY - 50);
-        ctx.bezierCurveTo(centerX - 50, centerY - 100, centerX + 50, centerY + 100, centerX + 100, centerY + 50);
-        ctx.stroke();
+        // Update dots
+        walkthroughDots.forEach((dot, i) => {
+            if (i === index) {
+                dot.classList.add('active');
+            } else {
+                dot.classList.remove('active');
+            }
+        });
         
-        ctx.font = '24px sans-serif';
-        ctx.fillStyle = '#666666';
-        ctx.textAlign = 'center';
-        ctx.fillText('Welcome to lifePAD', centerX, centerY + 100);
+        // Update buttons
+        walkthroughPrevBtn.disabled = (index === 0);
         
-        saveHistoryState();
-        saveCanvasToStorage();
-        closeIntro();
+        if (index === totalWalkthroughSlides - 1) {
+            walkthroughNextBtn.textContent = 'Start Drawing';
+        } else {
+            walkthroughNextBtn.textContent = 'Next';
+        }
+    }
+    
+    function nextWalkthroughSlide() {
+        if (currentWalkthroughSlide < totalWalkthroughSlides - 1) {
+            goToWalkthroughSlide(currentWalkthroughSlide + 1);
+        } else {
+            closeWalkthrough();
+        }
+    }
+    
+    function prevWalkthroughSlide() {
+        if (currentWalkthroughSlide > 0) {
+            goToWalkthroughSlide(currentWalkthroughSlide - 1);
+        }
     }
 
     // Toast notifications

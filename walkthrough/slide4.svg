@@ -1,0 +1,32 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f5f5f5"/>
+  
+  <!-- Canvas -->
+  <rect x="50" y="40" width="300" height="200" fill="white" stroke="#333" stroke-width="2"/>
+  
+  <!-- Toolbar buttons representation -->
+  <rect x="80" y="70" width="50" height="30" fill="#5a8dee" rx="4"/>
+  <text x="105" y="90" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">Undo</text>
+  
+  <rect x="140" y="70" width="50" height="30" fill="#5a8dee" rx="4"/>
+  <text x="165" y="90" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">Redo</text>
+  
+  <rect x="200" y="70" width="50" height="30" fill="#5a8dee" rx="4"/>
+  <text x="225" y="90" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">Clear</text>
+  
+  <rect x="260" y="70" width="50" height="30" fill="#44cc44" rx="4"/>
+  <text x="285" y="90" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle">Save</text>
+  
+  <!-- Zoom controls -->
+  <circle cx="100" cy="150" r="15" fill="#666"/>
+  <text x="100" y="155" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle">-</text>
+  
+  <text x="140" y="155" font-family="Arial, sans-serif" font-size="14" fill="#333" text-anchor="middle">100%</text>
+  
+  <circle cx="180" cy="150" r="15" fill="#666"/>
+  <text x="180" y="155" font-family="Arial, sans-serif" font-size="20" fill="white" text-anchor="middle">+</text>
+  
+  <!-- Text -->
+  <text x="200" y="270" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Use undo, redo, clear, save, and zoom</text>
+</svg>
