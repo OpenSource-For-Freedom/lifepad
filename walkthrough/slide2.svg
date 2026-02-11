@@ -1,0 +1,26 @@
+<svg width="400" height="300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="400" height="300" fill="#f5f5f5"/>
+  
+  <!-- Canvas -->
+  <rect x="50" y="40" width="300" height="200" fill="white" stroke="#333" stroke-width="2"/>
+  
+  <!-- Color swatches -->
+  <circle cx="80" cy="70" r="12" fill="#000000"/>
+  <circle cx="110" cy="70" r="12" fill="#ff4444"/>
+  <circle cx="140" cy="70" r="12" fill="#4488ff"/>
+  <circle cx="170" cy="70" r="12" fill="#44cc44"/>
+  <circle cx="200" cy="70" r="12" fill="#ffcc44"/>
+  
+  <!-- Brush size slider -->
+  <line x1="80" y1="110" x2="200" y2="110" stroke="#666" stroke-width="2"/>
+  <circle cx="140" cy="110" r="8" fill="#5a8dee"/>
+  
+  <!-- Sample strokes of different sizes -->
+  <line x1="80" y1="160" x2="150" y2="160" stroke="#000" stroke-width="2" stroke-linecap="round"/>
+  <line x1="170" y1="160" x2="240" y2="160" stroke="#ff4444" stroke-width="6" stroke-linecap="round"/>
+  <line x1="260" y1="160" x2="330" y2="160" stroke="#4488ff" stroke-width="10" stroke-linecap="round"/>
+  
+  <!-- Text -->
+  <text x="200" y="270" font-family="Arial, sans-serif" font-size="16" fill="#333" text-anchor="middle">Choose colors and adjust brush size</text>
+</svg>

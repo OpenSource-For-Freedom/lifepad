@@ -15,43 +15,115 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Intro Overlay -->
-    <div id="intro-overlay" class="intro-overlay">
-        <div class="intro-content">
-            <div class="intro-header">
-                <img src="icons/lifepad.PNG" alt="lifePAD Logo" class="intro-logo">
-                <h1>lifePAD</h1>
-                <p class="subtitle">Primary Artistry Device</p>
-            </div>
+    <!-- Walkthrough Modal -->
+    <div id="walkthrough-modal" class="walkthrough-modal">
+        <div class="walkthrough-content">
+            <button id="close-walkthrough" class="walkthrough-close" title="Close walkthrough">&times;</button>
             
-            <div class="intro-sections">
-                <section class="dedication">
+            <!-- Slide 0: Welcome -->
+            <div class="walkthrough-slide active" data-slide="0">
+                <div class="walkthrough-header">
+                    <img src="icons/lifepad.PNG" alt="lifePAD Logo" class="walkthrough-logo">
+                    <h1>Welcome to lifePAD</h1>
+                    <p class="walkthrough-subtitle">Primary Artistry Device</p>
+                </div>
+                <div class="walkthrough-body">
                     <h2>In Memory of Shirley Parrish</h2>
-                    <p>This app is dedicated to the memory of Shirley Parrish our "Gran", who taught me how to paint, draw, and embrace creativity. Her passion for art and design inspired this tool to help others express their creative vision.</p>
-                </section>
-                
-                <section>
-                    <h2>What it is</h2>
-                    <p>A creative sketch pad and design tool for artists and thinkers. Express your ideas through drawings, diagrams, shapes, and artistic brushes. Works with touch and stylus on any device.</p>
-                    <p><strong>💡 Best on tablets with stylus</strong> - For the optimal experience, use a tablet with stylus support for pressure-sensitive drawing.</p>
-                </section>
-                
-                <section>
-                    <h2>What you can do</h2>
-                    <p>Create beautiful diagrams and drawings with hand-drawn style shapes, add text labels, use different brush textures for artistic expression, and export as PNG or SVG. Real-time collaboration included.</p>
-                </section>
-                
-                <section>
-                    <h2>Privacy</h2>
-                    <p>Everything stays on your device. No accounts needed. No data sent anywhere unless you authorize it. Works completely offline.</p>
-                </section>
+                    <p>This app is dedicated to the memory of Shirley Parrish, who taught the creator how to paint, draw, and embrace creativity. Her passion for art and design inspired this tool to help others express their creative vision.</p>
+                    <p style="margin-top: 16px;">Let us show you how to use lifePAD to express your creativity.</p>
+                </div>
             </div>
             
-            <div class="intro-actions">
-                <button id="start-drawing" class="primary-btn">Start drawing</button>
-                <button id="sample-canvas" class="secondary-btn">Open sample canvas</button>
+            <!-- Slide 1: Drawing Basics -->
+            <div class="walkthrough-slide" data-slide="1">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide1.svg" alt="Drawing with touch, mouse, or stylus">
+                    </div>
+                    <h2>Start Drawing</h2>
+                    <p>Draw freely on the canvas using your finger, mouse, or stylus. The app supports pressure-sensitive drawing on devices with stylus support.</p>
+                    <p><strong>Best on tablets with stylus</strong> for the optimal creative experience.</p>
+                </div>
+            </div>
+            
+            <!-- Slide 2: Colors and Brushes -->
+            <div class="walkthrough-slide" data-slide="2">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide2.svg" alt="Color selection and brush size">
+                    </div>
+                    <h2>Colors and Brushes</h2>
+                    <p>Choose from 8 preset colors or use the custom color picker. Adjust the brush size from 1 to 48 pixels using the size slider.</p>
+                    <p>Try different brush textures: Ink, Pencil, Marker, Spray, and Charcoal for varied artistic effects.</p>
+                </div>
+            </div>
+            
+            <!-- Slide 3: Shapes and Tools -->
+            <div class="walkthrough-slide" data-slide="3">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide3.svg" alt="Shapes, arrows, and text">
+                    </div>
+                    <h2>Shapes and Text</h2>
+                    <p>Click the Tools dropdown and select Shapes to access rectangles, circles, triangles, arrows, stars, diamonds, and ellipses.</p>
+                    <p>Use the Text tool to add labels and annotations to your drawings. Toggle hand-drawn style for a sketchy look.</p>
+                </div>
+            </div>
+            
+            <!-- Slide 4: Editing Tools -->
+            <div class="walkthrough-slide" data-slide="4">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide4.svg" alt="Undo, redo, clear, save, and zoom">
+                    </div>
+                    <h2>Editing and Controls</h2>
+                    <p>Use Undo and Redo to manage your drawing history. Clear the canvas to start fresh, or Save PNG to export your work.</p>
+                    <p>Zoom in and out using the zoom buttons or pinch gestures. Pan around the canvas with the Pan tool.</p>
+                </div>
+            </div>
+            
+            <!-- Slide 5: Themes and Offline -->
+            <div class="walkthrough-slide" data-slide="5">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide5.svg" alt="Theme toggle and offline mode">
+                    </div>
+                    <h2>Themes and Privacy</h2>
+                    <p>Toggle between light and dark themes using the Theme button. Enable Paper mode for a warm, off-white background.</p>
+                    <p>lifePAD works completely offline after the first load. All your drawings stay on your device with no data sent anywhere.</p>
+                </div>
+            </div>
+            
+            <!-- Slide 6: Collaboration -->
+            <div class="walkthrough-slide" data-slide="6">
+                <div class="walkthrough-body">
+                    <div class="walkthrough-image">
+                        <img src="walkthrough/slide6.svg" alt="Real-time collaboration">
+                    </div>
+                    <h2>Collaborate Securely</h2>
+                    <p>Click the Collab button to start a real-time collaboration session with another person.</p>
+                    <p>All collaboration uses peer-to-peer connections with end-to-end encryption. No servers, no tracking, just secure creative collaboration.</p>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <div class="walkthrough-navigation">
+                <button id="walkthrough-prev" class="walkthrough-nav-btn">Previous</button>
+                <div class="walkthrough-dots" id="walkthrough-dots">
+                    <span class="walkthrough-dot active" data-slide="0"></span>
+                    <span class="walkthrough-dot" data-slide="1"></span>
+                    <span class="walkthrough-dot" data-slide="2"></span>
+                    <span class="walkthrough-dot" data-slide="3"></span>
+                    <span class="walkthrough-dot" data-slide="4"></span>
+                    <span class="walkthrough-dot" data-slide="5"></span>
+                    <span class="walkthrough-dot" data-slide="6"></span>
+                </div>
+                <button id="walkthrough-next" class="walkthrough-nav-btn primary">Next</button>
+            </div>
+            
+            <div class="walkthrough-footer">
                 <label class="checkbox-label">
-                    <input type="checkbox" id="dont-show-again">
+                    <input type="checkbox" id="dont-show-walkthrough">
                     <span>Do not show again</span>
                 </label>
             </div>
