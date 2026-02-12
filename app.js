@@ -170,7 +170,7 @@
     // DOM elements
     let bgCanvas, bgCtx, drawCanvas, ctx, canvasContainer;
     let overlayCanvas, overlayCtx;
-    let walkthroughModal, closeWalkthroughBtn, walkthroughPrevBtn, walkthroughNextBtn;
+    let walkthroughModal, walkthroughContent, closeWalkthroughBtn, walkthroughPrevBtn, walkthroughNextBtn;
     let walkthroughDots, walkthroughSlides, dontShowWalkthroughCheckbox;
     let colorSwatches, customColorPicker, penSizeSlider, penSizeValue;
     let hueShiftSlider, hueShiftValue;
@@ -201,6 +201,7 @@
     let answerBlobInput, answerInput, applyAnswerBtn;
     let joinPassphrase, offerBlobInput, createAnswerBtn, answerBlob, answerOutput, copyAnswerBtn;
     let disconnectBtn;
+    let collabEnabled = false;
     // Connection success modal elements
     let connectionSuccessModal, closeConnectionSuccess, localNameDisplay, remoteNameDisplay;
 
@@ -216,11 +217,13 @@
         canvasContainer = document.getElementById('canvas-container');
         toolStatus = document.getElementById('tool-status');
         walkthroughModal = document.getElementById('walkthrough-modal');
+        walkthroughContent = document.querySelector('.walkthrough-content');
         closeWalkthroughBtn = document.getElementById('close-walkthrough');
         walkthroughPrevBtn = document.getElementById('walkthrough-prev');
         walkthroughNextBtn = document.getElementById('walkthrough-next');
         walkthroughDots = document.querySelectorAll('.walkthrough-dot');
         walkthroughSlides = document.querySelectorAll('.walkthrough-slide');
+        totalWalkthroughSlides = walkthroughSlides.length;
         dontShowWalkthroughCheckbox = document.getElementById('dont-show-walkthrough');
         customColorPicker = document.getElementById('custom-color');
         penSizeSlider = document.getElementById('pen-size');
@@ -309,6 +312,8 @@
         // Tab buttons don't have IDs, select by class and data attribute
         hostTabBtn = document.querySelector('.tab-btn[data-tab="host"]');
         joinTabBtn = document.querySelector('.tab-btn[data-tab="join"]');
+
+        collabEnabled = Boolean(collabBtn && collabModal && collabStatus);
         
         // Connection success modal elements
         connectionSuccessModal = document.getElementById('connection-success-modal');
@@ -531,30 +536,32 @@
         paperBgCheckbox.addEventListener('change', togglePaperMode);
         
         // Collaboration
-        collabBtn.addEventListener('click', openCollabModal);
-        closeCollabModal.addEventListener('click', closeCollabModalFn);
-        hostTabBtn.addEventListener('click', () => switchTab('host'));
-        joinTabBtn.addEventListener('click', () => switchTab('join'));
-        createOfferBtn.addEventListener('click', handleCreateOffer);
-        copyOfferBtn.addEventListener('click', async () => {
-            try {
-                await copyToClipboard(offerBlob.value);
-                showToast('Copied to clipboard!');
-            } catch (error) {
-                showToast('Failed to copy - please select and copy manually');
-            }
-        });
-        applyAnswerBtn.addEventListener('click', handleApplyAnswer);
-        createAnswerBtn.addEventListener('click', handleCreateAnswer);
-        copyAnswerBtn.addEventListener('click', async () => {
-            try {
-                await copyToClipboard(answerBlob.value);
-                showToast('Copied to clipboard!');
-            } catch (error) {
-                showToast('Failed to copy - please select and copy manually');
-            }
-        });
-        disconnectBtn.addEventListener('click', handleDisconnect);
+        if (collabEnabled) {
+            collabBtn.addEventListener('click', openCollabModal);
+            closeCollabModal.addEventListener('click', closeCollabModalFn);
+            hostTabBtn.addEventListener('click', () => switchTab('host'));
+            joinTabBtn.addEventListener('click', () => switchTab('join'));
+            createOfferBtn.addEventListener('click', handleCreateOffer);
+            copyOfferBtn.addEventListener('click', async () => {
+                try {
+                    await copyToClipboard(offerBlob.value);
+                    showToast('Copied to clipboard!');
+                } catch (error) {
+                    showToast('Failed to copy - please select and copy manually');
+                }
+            });
+            applyAnswerBtn.addEventListener('click', handleApplyAnswer);
+            createAnswerBtn.addEventListener('click', handleCreateAnswer);
+            copyAnswerBtn.addEventListener('click', async () => {
+                try {
+                    await copyToClipboard(answerBlob.value);
+                    showToast('Copied to clipboard!');
+                } catch (error) {
+                    showToast('Failed to copy - please select and copy manually');
+                }
+            });
+            disconnectBtn.addEventListener('click', handleDisconnect);
+        }
 
         // Tools dropdown
         toolsBtn.addEventListener('click', toggleToolsMenu);
@@ -1694,7 +1701,7 @@
 
     // Walkthrough modal functions
     let currentWalkthroughSlide = 0;
-    const totalWalkthroughSlides = 7;
+    let totalWalkthroughSlides = 6;
     
     function checkWalkthroughPreference() {
         const dontShow = localStorage.getItem('lifepad-no-walkthrough');
@@ -1735,6 +1742,11 @@
                 dot.classList.remove('active');
             }
         });
+
+        if (walkthroughContent) {
+            walkthroughContent.scrollTop = 0;
+        }
+
         
         // Update buttons
         walkthroughPrevBtn.disabled = (index === 0);
@@ -2635,16 +2647,25 @@
     // ============================================
     
     function openCollabModal() {
+        if (!collabModal) {
+            return;
+        }
         collabModal.classList.remove('hidden');
     }
     
     function closeCollabModalFn() {
         console.log('Closing collaboration modal');
+        if (!collabModal) {
+            return;
+        }
         collabModal.classList.add('hidden');
     }
     
     function openCollabModalFn() {
         console.log('Opening collaboration modal');
+        if (!collabModal) {
+            return;
+        }
         collabModal.classList.remove('hidden');
     }
     
@@ -2928,6 +2949,9 @@
     }
     
     function updateCollabStatus(status) {
+        if (!collabStatus) {
+            return;
+        }
         collabStatus.textContent = status;
         
         // Update CSS class for styling
@@ -2938,11 +2962,17 @@
     }
     
     function showCollabError(message) {
+        if (!collabError) {
+            return;
+        }
         collabError.textContent = message;
         collabError.classList.remove('hidden');
     }
     
     function clearCollabError() {
+        if (!collabError) {
+            return;
+        }
         collabError.textContent = '';
         collabError.classList.add('hidden');
     }

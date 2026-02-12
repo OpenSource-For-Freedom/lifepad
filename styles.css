@@ -74,7 +74,11 @@ html, body {
 }
 
 .walkthrough-content {
-    background: var(--bg-secondary);
+    background-color: var(--bg-secondary);
+    background-image: url('/walkthrough/gran.jpeg');
+    background-position: center;
+    background-size: cover;
+    background-repeat: no-repeat;
     border-radius: 16px;
     padding: 32px;
     max-width: 600px;
@@ -84,6 +88,19 @@ html, body {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     animation: slideUp 0.4s ease-out;
     position: relative;
+}
+
+.walkthrough-content::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(20, 20, 20, 0.62), rgba(20, 20, 20, 0.82));
+}
+
+.walkthrough-content > * {
+    position: relative;
+    z-index: 1;
 }
 
 @keyframes slideUp {
@@ -204,6 +221,19 @@ html, body {
     color: var(--text-secondary);
     margin-bottom: 12px;
     text-align: center;
+}
+
+/* Walkthrough welcome slide text contrast */
+.walkthrough-content .walkthrough-header {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.walkthrough-content .walkthrough-header h1,
+.walkthrough-content .walkthrough-subtitle,
+.walkthrough-content .walkthrough-body h2,
+.walkthrough-content .walkthrough-body p {
+    color: #f5f5f5;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
 
 .walkthrough-navigation {

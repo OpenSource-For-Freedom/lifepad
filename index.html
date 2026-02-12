@@ -17,7 +17,7 @@
 <body>
     <!-- Walkthrough Modal -->
     <div id="walkthrough-modal" class="walkthrough-modal">
-        <div class="walkthrough-content">
+        <div class="walkthrough-content has-welcome-bg">
             <button id="close-walkthrough" class="walkthrough-close" title="Close walkthrough">&times;</button>
             
             <!-- Slide 0: Welcome -->
@@ -81,28 +81,12 @@
                     <p>Zoom in and out using the zoom buttons or pinch gestures. Pan around the canvas with the Pan tool.</p>
                 </div>
             </div>
-            
-            <!-- Slide 5: Themes and Offline -->
+
+            <!-- Slide 5: Thank You -->
             <div class="walkthrough-slide" data-slide="5">
                 <div class="walkthrough-body">
-                    <div class="walkthrough-image">
-                        <img src="walkthrough/slide5.svg" alt="Theme toggle and offline mode">
-                    </div>
-                    <h2>Themes and Privacy</h2>
-                    <p>Toggle between light and dark themes using the Theme button. Enable Paper mode for a warm, off-white background.</p>
-                    <p>lifePAD works completely offline after the first load. All your drawings stay on your device with no data sent anywhere.</p>
-                </div>
-            </div>
-            
-            <!-- Slide 6: Collaboration -->
-            <div class="walkthrough-slide" data-slide="6">
-                <div class="walkthrough-body">
-                    <div class="walkthrough-image">
-                        <img src="walkthrough/slide6.svg" alt="Real-time collaboration">
-                    </div>
-                    <h2>Collaborate Securely</h2>
-                    <p>Click the Collab button to start a real-time collaboration session with another person.</p>
-                    <p>All collaboration uses peer-to-peer connections with end-to-end encryption. No servers, no tracking, just secure creative collaboration.</p>
+                    <h2>Thank you for choosing LifePad.</h2>
+                    <p>Please, stay creative -Tim</p>
                 </div>
             </div>
             
@@ -116,7 +100,6 @@
                     <span class="walkthrough-dot" data-slide="3"></span>
                     <span class="walkthrough-dot" data-slide="4"></span>
                     <span class="walkthrough-dot" data-slide="5"></span>
-                    <span class="walkthrough-dot" data-slide="6"></span>
                 </div>
                 <button id="walkthrough-next" class="walkthrough-nav-btn primary">Next</button>
             </div>
@@ -202,8 +185,6 @@
             </div>
 
             <div class="nav-section collab-status-section">
-                <button id="collab-btn" class="tool-btn" title="Collaboration">Collab</button>
-                <span id="collab-status" class="collab-status">Disconnected</span>
                 <span id="tool-status" class="tool-status">Tool: Brush</span>
             </div>
 

@@ -1,0 +1,13 @@
+{
+  "name": "lifepad",
+  "version": "1.0.0",
+  "description": "LifePad PWA",
+  "scripts": {
+    "predev": "powershell -Command \"$p = Get-Process -Id (Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue; if($p){Stop-Process -InputObject $p -Force}; exit 0\"",
+    "dev": "npx http-server -p 3000 -c-1 -o",
+    "start": "npx http-server -p 3000 -c-1"
+  },
+  "keywords": ["pwa", "productivity"],
+  "author": "",
+  "license": "MIT"
+}
