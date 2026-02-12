@@ -3357,7 +3357,7 @@
         remoteCursor: { x: 0, y: 0, visible: false },
         
         // Configuration constants
-        ICE_GATHERING_TIMEOUT: 30000, // 30 seconds
+        ICE_GATHERING_TIMEOUT: 5000, // 5 seconds - enough for most cases, prevent long waits
         
         // STUN and TURN server configuration
         // STUN: helps find public IP when direct connection possible
@@ -3510,28 +3510,49 @@
         // Create offer (host)
         async createOffer(passphrase) {
             try {
+                console.log('🔗 Creating offer...');
                 this.isHost = true;
                 this.salt = Crypto.generateRandomBytes(16);
                 this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
                 
+                console.log('Creating peer connection...');
                 this.createPeerConnection();
+                
+                console.log('Creating data channel...');
                 this.createDataChannel();
                 
+                console.log('Creating offer...');
                 const offer = await this.peerConnection.createOffer();
-                await this.peerConnection.setLocalDescription(offer);
-                console.log('Offer created - signaling state:', this.peerConnection.signalingState);
                 
-                // Wait for ICE gathering to complete
+                console.log('Setting local description (offer)...');
+                await this.peerConnection.setLocalDescription(offer);
+                console.log('✓ Offer created - signaling state:', this.peerConnection.signalingState);
+                
+                // Check connection is still alive
+                if (!this.peerConnection || this.peerConnection.signalingState === 'closed') {
+                    throw new Error('Peer connection closed while setting local description');
+                }
+                
+                // Wait for ICE gathering to complete (or timeout)
+                console.log('Gathering ICE candidates...');
                 await this.waitForICEGathering();
                 
+                // Verify SDP is available
+                if (!this.peerConnection.localDescription || !this.peerConnection.localDescription.sdp) {
+                    throw new Error('Failed to get offer SDP');
+                }
+                
                 // Return offer blob
-                return {
+                const offerBlob = {
                     app: 'lifePAD',
                     v: 1,
                     type: 'offer',
                     sdp: this.peerConnection.localDescription.sdp,
                     saltB64: Crypto.arrayBufferToBase64(this.salt)
                 };
+                
+                console.log('✓ Offer ready to send');
+                return offerBlob;
             } catch (error) {
                 console.error('Error creating offer:', error);
                 // Clean up on error
@@ -3578,14 +3599,17 @@
         // Create answer (joiner)
         async createAnswer(passphrase, offerBlob) {
             try {
+                console.log('🔗 Creating answer...');
                 this.isHost = false;
                 this.salt = Crypto.base64ToArrayBuffer(offerBlob.saltB64);
                 this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
                 
+                console.log('Creating peer connection...');
                 this.createPeerConnection();
                 
                 // Setup data channel handler for joiner
                 this.peerConnection.ondatachannel = (event) => {
+                    console.log('📡 Data channel received from host');
                     this.dataChannel = event.channel;
                     this.setupDataChannelHandlers();
                 };
@@ -3600,24 +3624,42 @@
                     sdp: offerBlob.sdp
                 };
                 
+                console.log('Setting remote description (offer)...');
                 await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                console.log('Offer set successfully - signaling state:', this.peerConnection.signalingState);
+                console.log('✓ Offer set successfully - signaling state:', this.peerConnection.signalingState);
                 
+                console.log('Creating answer...');
                 const answer = await this.peerConnection.createAnswer();
-                await this.peerConnection.setLocalDescription(answer);
-                console.log('Answer created - signaling state:', this.peerConnection.signalingState);
                 
-                // Wait for ICE gathering to complete
+                console.log('Setting local description (answer)...');
+                await this.peerConnection.setLocalDescription(answer);
+                console.log('✓ Answer created - signaling state:', this.peerConnection.signalingState);
+                
+                // Check connection is still alive before waiting for ICE
+                if (!this.peerConnection || this.peerConnection.signalingState === 'closed') {
+                    throw new Error('Peer connection closed while setting local description');
+                }
+                
+                // Wait for ICE gathering to complete (or timeout)
+                console.log('Gathering ICE candidates...');
                 await this.waitForICEGathering();
                 
+                // Verify SDP is available
+                if (!this.peerConnection.localDescription || !this.peerConnection.localDescription.sdp) {
+                    throw new Error('Failed to get answer SDP');
+                }
+                
                 // Return answer blob
-                return {
+                const answerBlob = {
                     app: 'lifePAD',
                     v: 1,
                     type: 'answer',
                     sdp: this.peerConnection.localDescription.sdp,
                     saltB64: offerBlob.saltB64 // Echo back salt
                 };
+                
+                console.log('✓ Answer ready to send');
+                return answerBlob;
             } catch (error) {
                 console.error('Error creating answer:', error);
                 // Clean up on error
@@ -3633,16 +3675,28 @@
         // Wait for ICE gathering to complete
         waitForICEGathering() {
             return new Promise((resolve, reject) => {
+                // Check peer connection is alive
+                if (!this.peerConnection) {
+                    reject(new Error('Peer connection is closed'));
+                    return;
+                }
+                
                 if (this.peerConnection.iceGatheringState === 'complete') {
-                    console.log('ICE already complete, resolving immediately');
+                    console.log('✓ ICE already complete, resolving immediately');
                     resolve();
                     return;
                 }
                 
-                console.log('Waiting for ICE gathering - current state:', this.peerConnection.iceGatheringState);
+                if (this.peerConnection.signalingState === 'closed') {
+                    reject(new Error('Peer connection is closed before ICE gathering'));
+                    return;
+                }
+                
+                console.log('⏳ Waiting for ICE gathering - current state:', this.peerConnection.iceGatheringState);
                 
                 let timeoutHandle;
                 let eventHandler;
+                let gatheringComplete = false;
                 
                 const cleanup = () => {
                     clearTimeout(timeoutHandle);
@@ -3652,17 +3706,30 @@
                 };
                 
                 timeoutHandle = setTimeout(() => {
-                    cleanup();
-                    const state = this.peerConnection ? this.peerConnection.iceGatheringState : 'closed';
-                    console.warn('ICE gathering timeout - state:', state);
-                    reject(new Error(`ICE gathering timeout (state: ${state})`));
+                    if (!gatheringComplete) {
+                        cleanup();
+                        const state = this.peerConnection ? this.peerConnection.iceGatheringState : 'closed';
+                        
+                        if (state === 'closed') {
+                            console.error('✗ ICE gathering timeout - peer connection closed');
+                            reject(new Error('Peer connection closed during ICE gathering'));
+                        } else {
+                            // Timeout but connection still alive - use what we have
+                            console.warn('⚠ ICE gathering timeout after 5s - using partial ICE candidates');
+                            console.log('Current ICE candidates gathered - continuing anyway');
+                            resolve();
+                        }
+                    }
                 }, this.ICE_GATHERING_TIMEOUT);
                 
                 eventHandler = () => {
                     if (this.peerConnection && this.peerConnection.iceGatheringState === 'complete') {
-                        console.log('ICE gathering complete');
-                        cleanup();
-                        resolve();
+                        if (!gatheringComplete) {
+                            gatheringComplete = true;
+                            console.log('✓ ICE gathering complete');
+                            cleanup();
+                            resolve();
+                        }
                     }
                 };
                 
