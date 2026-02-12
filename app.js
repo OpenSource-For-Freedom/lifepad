@@ -2752,7 +2752,7 @@
             console.log('Current signaling state before applying answer:', signalingState);
             
             if (signalingState !== 'have-local-offer') {
-                showCollabError(`Session is in wrong state (${signalingState}). Please refresh and try again with a new offer.`);
+                showCollabError(`Session is in wrong state (${signalingState}). Create a fresh offer and try again.`);
                 return;
             }
             
@@ -2803,7 +2803,16 @@
             
         } catch (error) {
             console.error('Apply answer error:', error);
-            showCollabError('Failed to apply answer: ' + error.message);
+            
+            // Provide helpful error messages
+            let errorMsg = error.message;
+            if (errorMsg.includes('stable')) {
+                errorMsg = 'Connection already established or in wrong state. Click "Disconnect" and create a fresh offer.';
+            } else if (errorMsg.includes('have-local-offer')) {
+                errorMsg = 'No pending offer. Create a fresh offer first.';
+            }
+            
+            showCollabError('Failed to apply answer: ' + errorMsg);
             // Clean up on error
             RTC.disconnect();
             applyAnswerBtn.disabled = false;
@@ -3568,24 +3577,38 @@
         // Apply answer (host)
         async applyAnswer(answerBlob) {
             try {
-                // Log current state for debugging
+                // Log current state for debugging  
                 const signalingState = this.peerConnection.signalingState;
-                console.log('Applying answer - signaling state:', signalingState);
+                const connectionState = this.peerConnection.connectionState;
+                console.log('Applying answer - signaling state:', signalingState, 'connection state:', connectionState);
+                
+                // Check if already in stable state (connection established)
+                if (signalingState === 'stable') {
+                    console.log('⚠ Already in stable state - connection may already be established');
+                    // If connection is already connected, we're good!
+                    if (connectionState === 'connected' || connectionState === 'connecting') {
+                        console.log('✓ Connection already established, skipping answer application');
+                        return;
+                    }
+                    // Otherwise, this is an error - can't apply answer to stable connection
+                    throw new Error(`Cannot apply answer in signaling state "stable". The connection has already transitioned. Try creating a fresh offer.`);
+                }
                 
                 // Only apply answer if we're in the 'have-local-offer' state
                 if (signalingState !== 'have-local-offer') {
-                    throw new Error(`Cannot apply answer in signaling state "${signalingState}". Remote answer may have already been applied or connection was reset.`);
+                    throw new Error(`Cannot apply answer in signaling state "${signalingState}". Expected 'have-local-offer'. Try creating a fresh offer.`);
                 }
                 
+                console.log('Setting remote description (answer)...');
                 const answer = {
                     type: 'answer',
                     sdp: answerBlob.sdp
                 };
                 
                 await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-                console.log('Answer applied successfully');
+                console.log('✓ Answer applied successfully');
             } catch (error) {
-                console.error('Error applying answer:', error);
+                console.error('✗ Error applying answer:', error);
                 // Clean up on error
                 if (this.peerConnection) {
                     this.peerConnection.close();
