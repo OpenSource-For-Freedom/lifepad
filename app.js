@@ -2639,7 +2639,13 @@
     }
     
     function closeCollabModalFn() {
+        console.log('Closing collaboration modal');
         collabModal.classList.add('hidden');
+    }
+    
+    function openCollabModalFn() {
+        console.log('Opening collaboration modal');
+        collabModal.classList.remove('hidden');
     }
     
     function switchTab(tab) {
@@ -2856,6 +2862,10 @@
     
     function handleDisconnect() {
         RTC.disconnect();
+        
+        // Close both modals
+        collabModal.classList.add('hidden');
+        connectionSuccessModal.classList.add('hidden');
         
         // Reset UI
         hostPassphrase.value = '';
@@ -3370,9 +3380,15 @@
         // Setup data channel event handlers
         setupDataChannelHandlers() {
             this.dataChannel.onopen = async () => {
-                console.log('Data channel opened');
-                // Start encrypted handshake
-                await this.sendHandshake();
+                console.log('Data channel opened - state:', this.dataChannel.readyState);
+                try {
+                    // Start encrypted handshake
+                    await this.sendHandshake();
+                    console.log('Handshake sent successfully');
+                } catch (error) {
+                    console.error('Error sending handshake:', error);
+                    showCollabError('Failed to send handshake: ' + error.message);
+                }
             };
             
             this.dataChannel.onclose = () => {
@@ -3382,7 +3398,8 @@
             
             this.dataChannel.onerror = (error) => {
                 console.error('Data channel error:', error);
-                showCollabError('Data channel error occurred');
+                showCollabError('Data channel error: ' + (error.message || 'Unknown error'));
+                this.disconnect();
             };
             
             this.dataChannel.onmessage = async (event) => {
@@ -3616,14 +3633,33 @@
         completeHandshake() {
             this.handshakeComplete = true;
             updateCollabStatus(`Connected to ${this.remoteName || 'Peer'}`);
-            closeCollabModalFn();
+            
+            // Immediately and explicitly close the collaboration modal
+            console.log('Handshake complete - closing collab modal');
+            collabModal.classList.add('hidden');
+            collabModal.style.display = 'none';
             
             // Show success modal with both names
-            const localNameDisplay = this.localName || 'You';
-            const remoteNameDisplay = this.remoteName || 'Partner';
+            const localName = this.localName || 'You';
+            const remoteName = this.remoteName || 'Partner';
             
-            // Create and show success notification
-            showConnectionSuccessModal(localNameDisplay, remoteNameDisplay);
+            // Ensure success modal is visible with small delay to ensure modal is hidden first
+            setTimeout(() => {
+                console.log('Showing connection success modal');
+                localNameDisplay.textContent = localName;
+                remoteNameDisplay.textContent = remoteName;
+                connectionSuccessModal.classList.remove('hidden');
+                connectionSuccessModal.style.display = '';
+            }, 150);
+            
+            // Safety timeout to ensure modal is closed
+            setTimeout(() => {
+                if (!collabModal.classList.contains('hidden')) {
+                    console.warn('Safety timeout: Forcing collab modal to close');
+                    collabModal.classList.add('hidden');
+                    collabModal.style.display = 'none';
+                }
+            }, 500);
         },
         
         // Handle hello handshake
