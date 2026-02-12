@@ -3359,34 +3359,101 @@
         // Configuration constants
         ICE_GATHERING_TIMEOUT: 30000, // 30 seconds
         
-        // STUN server configuration
-        stunServers: [
-            'stun:stun.l.google.com:19302',
-            'stun:stun1.l.google.com:19302',
-            'stun:stun2.l.google.com:19302'
+        // STUN and TURN server configuration
+        // STUN: helps find public IP when direct connection possible
+        // TURN: relays traffic when direct connection blocked (NAT, firewall, etc.)
+        iceServers: [
+            // STUN servers (free, no relay)
+            { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
+            
+            // TURN servers (public, free relays)
+            // OpenRelay - free public TURN server
+            {
+                urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+                username: 'openrelayproject',
+                credential: 'openrelayproject'
+            },
+            
+            // Coturn public TURN server
+            {
+                urls: ['turn:numb.viagenie.ca'],
+                username: 'webrtc@example.com',
+                credential: 'webrtc'
+            }
         ],
         
         // Initialize peer connection
         createPeerConnection() {
             const config = {
-                iceServers: this.stunServers.map(url => ({ urls: url }))
+                iceServers: this.iceServers
             };
             
+            console.log('Creating peer connection with ICE servers:', this.iceServers.length, 'configurations');
             this.peerConnection = new RTCPeerConnection(config);
             
             // ICE candidate handling
             this.peerConnection.onicecandidate = (event) => {
-                // Using non-trickle ICE, so we wait for gathering to complete
+                if (event.candidate) {
+                    console.log('📡 ICE candidate found:', {
+                        candidate: event.candidate.candidate.split(' ')[0],
+                        type: event.candidate.type,
+                        address: event.candidate.address
+                    });
+                } else {
+                    console.log('✓ ICE gathering complete');
+                }
+            };
+            
+            // ICE connection state changes
+            this.peerConnection.onicecandidateerror = (error) => {
+                console.error('✗ ICE candidate error:', error);
+            };
+            
+            this.peerConnection.oniceconnectionstatechange = () => {
+                const state = this.peerConnection.iceConnectionState;
+                console.log('🔌 ICE connection state:', state);
+                
+                if (state === 'failed') {
+                    console.error('✗ ICE failed - trying TURN servers...');
+                } else if (state === 'connected' || state === 'completed') {
+                    console.log('✓ ICE connection established');
+                }
             };
             
             // Connection state changes
             this.peerConnection.onconnectionstatechange = () => {
                 const state = this.peerConnection.connectionState;
-                console.log('Connection state:', state);
+                const signalingState = this.peerConnection.signalingState;
+                const iceConnectionState = this.peerConnection.iceConnectionState;
+                
+                console.log('Connection state change:', {
+                    connectionState: state,
+                    signalingState: signalingState,
+                    iceConnectionState: iceConnectionState,
+                    handshakeComplete: this.handshakeComplete
+                });
                 
                 if (state === 'connected') {
+                    console.log('✓ Peer connection established');
                     updateCollabStatus('Connected');
-                } else if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+                } else if (state === 'connecting') {
+                    console.log('⏳ Peer connection connecting...');
+                    updateCollabStatus('Connecting');
+                } else if (state === 'failed') {
+                    console.error('✗ Peer connection failed');
+                    this.handleDisconnect();
+                } else if (state === 'disconnected') {
+                    console.warn('⚠ Peer connection disconnected');
+                    // Don't auto-disconnect on temporary disconnection
+                    // Wait a moment to see if it reconnects
+                    setTimeout(() => {
+                        if (this.peerConnection && this.peerConnection.connectionState === 'disconnected') {
+                            console.log('Still disconnected after 5s, calling handleDisconnect');
+                            this.handleDisconnect();
+                        }
+                    }, 5000);
+                } else if (state === 'closed') {
+                    console.log('⚠ Peer connection closed');
                     this.handleDisconnect();
                 }
             };
@@ -3407,30 +3474,32 @@
         // Setup data channel event handlers
         setupDataChannelHandlers() {
             this.dataChannel.onopen = async () => {
-                console.log('Data channel opened - state:', this.dataChannel.readyState);
+                console.log('✓ Data channel opened - state:', this.dataChannel.readyState);
                 try {
                     // Start encrypted handshake
+                    console.log('Sending handshake...');
                     await this.sendHandshake();
-                    console.log('Handshake sent successfully');
+                    console.log('✓ Handshake sent successfully');
                 } catch (error) {
-                    console.error('Error sending handshake:', error);
+                    console.error('✗ Error sending handshake:', error);
                     showCollabError('Failed to send handshake: ' + error.message);
                 }
             };
             
             this.dataChannel.onclose = () => {
-                console.log('Data channel closed');
+                console.log('⚠ Data channel closed');
                 this.handleDisconnect();
             };
             
             this.dataChannel.onerror = (error) => {
-                console.error('Data channel error:', error);
+                console.error('✗ Data channel error:', error);
                 showCollabError('Data channel error: ' + (error.message || 'Unknown error'));
                 this.disconnect();
             };
             
             this.dataChannel.onmessage = async (event) => {
                 try {
+                    console.log('Received message on data channel');
                     await this.handleMessage(event.data);
                 } catch (error) {
                     console.error('Message handling error:', error);
@@ -3610,6 +3679,8 @@
                 this.localName = NameGenerator.generateName();
             }
             
+            console.log('Sending hello from:', this.localName);
+            
             const nonce = Crypto.arrayBufferToBase64(Crypto.generateRandomBytes(16));
             const handshake = {
                 kind: 'hello',
@@ -3618,7 +3689,13 @@
                 name: this.localName
             };
             
-            await this.sendEncrypted(handshake);
+            try {
+                await this.sendEncrypted(handshake);
+                console.log('✓ Hello sent successfully');
+            } catch (error) {
+                console.error('✗ Failed to send hello:', error);
+                throw error;
+            }
         },
         
         // Handle incoming message
@@ -3635,6 +3712,7 @@
                 );
                 
                 const message = JSON.parse(plaintext);
+                console.log('Received message:', message.kind);
                 
                 // Route message by kind
                 if (message.kind === 'hello') {
@@ -3642,15 +3720,18 @@
                 } else if (message.kind === 'hello_ack') {
                     await this.handleHelloAck(message);
                 } else if (message.kind === 'snapshot') {
+                    console.log('Received snapshot');
                     Sync.handleSnapshot(message);
                 } else if (message.kind === 'draw_event') {
                     Sync.handleDrawEvent(message);
                 } else if (message.kind === 'cursor') {
                     this.handleCursorUpdate(message);
+                } else {
+                    console.warn('Unknown message kind:', message.kind);
                 }
                 
             } catch (error) {
-                console.error('Decryption failed:', error);
+                console.error('✗ Decryption/message handling failed:', error);
                 showCollabError('Key mismatch - wrong passphrase');
                 this.disconnect();
             }
@@ -3697,6 +3778,7 @@
         
         // Handle hello handshake
         async handleHello(message) {
+            console.log('✓ Received hello from peer:', message.name);
             // Capture remote name
             this.remoteName = message.name || 'Partner';
             
@@ -3712,19 +3794,32 @@
                 name: this.localName
             };
             
-            await this.sendEncrypted(ack);
+            try {
+                await this.sendEncrypted(ack);
+                console.log('✓ Sent hello_ack');
+            } catch (error) {
+                console.error('✗ Failed to send hello_ack:', error);
+                return;
+            }
             
             // Complete handshake
             this.completeHandshake();
             
             // If host, send snapshot
             if (this.isHost) {
-                await Sync.sendSnapshot();
+                console.log('Sending canvas snapshot as host...');
+                try {
+                    await Sync.sendSnapshot();
+                    console.log('✓ Snapshot sent');
+                } catch (error) {
+                    console.error('✗ Failed to send snapshot:', error);
+                }
             }
         },
         
         // Handle hello ack
         async handleHelloAck(message) {
+            console.log('✓ Received hello_ack from peer:', message.name);
             // Capture remote name
             this.remoteName = message.name || 'Partner';
             
