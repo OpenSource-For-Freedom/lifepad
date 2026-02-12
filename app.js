@@ -2705,6 +2705,8 @@
         } catch (error) {
             console.error('Create offer error:', error);
             showCollabError('Failed to create offer: ' + error.message);
+            // Clean up on error
+            RTC.disconnect();
             createOfferBtn.disabled = false;
             createOfferBtn.textContent = 'Create Offer';
             updateCollabStatus('Disconnected');
@@ -2739,6 +2741,15 @@
                 return;
             }
             
+            // Check signaling state
+            const signalingState = RTC.peerConnection.signalingState;
+            console.log('Current signaling state before applying answer:', signalingState);
+            
+            if (signalingState !== 'have-local-offer') {
+                showCollabError(`Session is in wrong state (${signalingState}). Please refresh and try again with a new offer.`);
+                return;
+            }
+            
             clearCollabError();
             applyAnswerBtn.disabled = true;
             applyAnswerBtn.textContent = 'Connecting...';
@@ -2760,8 +2771,11 @@
         } catch (error) {
             console.error('Apply answer error:', error);
             showCollabError('Failed to apply answer: ' + error.message);
+            // Clean up on error
+            RTC.disconnect();
             applyAnswerBtn.disabled = false;
             applyAnswerBtn.textContent = 'Connect';
+            updateCollabStatus('Disconnected');
         }
     }
     
@@ -2832,6 +2846,8 @@
         } catch (error) {
             console.error('Create answer error:', error);
             showCollabError('Failed to create answer: ' + error.message);
+            // Clean up on error
+            RTC.disconnect();
             createAnswerBtn.disabled = false;
             createAnswerBtn.textContent = 'Create Answer';
             updateCollabStatus('Disconnected');
@@ -3380,93 +3396,166 @@
         
         // Create offer (host)
         async createOffer(passphrase) {
-            this.isHost = true;
-            this.salt = Crypto.generateRandomBytes(16);
-            this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
-            
-            this.createPeerConnection();
-            this.createDataChannel();
-            
-            const offer = await this.peerConnection.createOffer();
-            await this.peerConnection.setLocalDescription(offer);
-            
-            // Wait for ICE gathering to complete
-            await this.waitForICEGathering();
-            
-            // Return offer blob
-            return {
-                app: 'lifePAD',
-                v: 1,
-                type: 'offer',
-                sdp: this.peerConnection.localDescription.sdp,
-                saltB64: Crypto.arrayBufferToBase64(this.salt)
-            };
+            try {
+                this.isHost = true;
+                this.salt = Crypto.generateRandomBytes(16);
+                this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
+                
+                this.createPeerConnection();
+                this.createDataChannel();
+                
+                const offer = await this.peerConnection.createOffer();
+                await this.peerConnection.setLocalDescription(offer);
+                console.log('Offer created - signaling state:', this.peerConnection.signalingState);
+                
+                // Wait for ICE gathering to complete
+                await this.waitForICEGathering();
+                
+                // Return offer blob
+                return {
+                    app: 'lifePAD',
+                    v: 1,
+                    type: 'offer',
+                    sdp: this.peerConnection.localDescription.sdp,
+                    saltB64: Crypto.arrayBufferToBase64(this.salt)
+                };
+            } catch (error) {
+                console.error('Error creating offer:', error);
+                // Clean up on error
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null;
+                }
+                this.dataChannel = null;
+                throw error;
+            }
         },
         
         // Apply answer (host)
         async applyAnswer(answerBlob) {
-            const answer = {
-                type: 'answer',
-                sdp: answerBlob.sdp
-            };
-            
-            await this.peerConnection.setRemoteDescription(answer);
+            try {
+                // Log current state for debugging
+                const signalingState = this.peerConnection.signalingState;
+                console.log('Applying answer - signaling state:', signalingState);
+                
+                // Only apply answer if we're in the 'have-local-offer' state
+                if (signalingState !== 'have-local-offer') {
+                    throw new Error(`Cannot apply answer in signaling state "${signalingState}". Remote answer may have already been applied or connection was reset.`);
+                }
+                
+                const answer = {
+                    type: 'answer',
+                    sdp: answerBlob.sdp
+                };
+                
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log('Answer applied successfully');
+            } catch (error) {
+                console.error('Error applying answer:', error);
+                // Clean up on error
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null;
+                }
+                this.dataChannel = null;
+                throw error;
+            }
         },
         
         // Create answer (joiner)
         async createAnswer(passphrase, offerBlob) {
-            this.isHost = false;
-            this.salt = Crypto.base64ToArrayBuffer(offerBlob.saltB64);
-            this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
-            
-            this.createPeerConnection();
-            
-            // Setup data channel handler for joiner
-            this.peerConnection.ondatachannel = (event) => {
-                this.dataChannel = event.channel;
-                this.setupDataChannelHandlers();
-            };
-            
-            const offer = {
-                type: 'offer',
-                sdp: offerBlob.sdp
-            };
-            
-            await this.peerConnection.setRemoteDescription(offer);
-            const answer = await this.peerConnection.createAnswer();
-            await this.peerConnection.setLocalDescription(answer);
-            
-            // Wait for ICE gathering to complete
-            await this.waitForICEGathering();
-            
-            // Return answer blob
-            return {
-                app: 'lifePAD',
-                v: 1,
-                type: 'answer',
-                sdp: this.peerConnection.localDescription.sdp,
-                saltB64: offerBlob.saltB64 // Echo back salt
-            };
+            try {
+                this.isHost = false;
+                this.salt = Crypto.base64ToArrayBuffer(offerBlob.saltB64);
+                this.encryptionKey = await Crypto.deriveKey(passphrase, this.salt);
+                
+                this.createPeerConnection();
+                
+                // Setup data channel handler for joiner
+                this.peerConnection.ondatachannel = (event) => {
+                    this.dataChannel = event.channel;
+                    this.setupDataChannelHandlers();
+                };
+                
+                // Check signaling state before setting offer
+                if (this.peerConnection.signalingState !== 'stable') {
+                    throw new Error(`Unexpected signaling state: ${this.peerConnection.signalingState}`);
+                }
+                
+                const offer = {
+                    type: 'offer',
+                    sdp: offerBlob.sdp
+                };
+                
+                await this.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                console.log('Offer set successfully - signaling state:', this.peerConnection.signalingState);
+                
+                const answer = await this.peerConnection.createAnswer();
+                await this.peerConnection.setLocalDescription(answer);
+                console.log('Answer created - signaling state:', this.peerConnection.signalingState);
+                
+                // Wait for ICE gathering to complete
+                await this.waitForICEGathering();
+                
+                // Return answer blob
+                return {
+                    app: 'lifePAD',
+                    v: 1,
+                    type: 'answer',
+                    sdp: this.peerConnection.localDescription.sdp,
+                    saltB64: offerBlob.saltB64 // Echo back salt
+                };
+            } catch (error) {
+                console.error('Error creating answer:', error);
+                // Clean up on error
+                if (this.peerConnection) {
+                    this.peerConnection.close();
+                    this.peerConnection = null;
+                }
+                this.dataChannel = null;
+                throw error;
+            }
         },
         
         // Wait for ICE gathering to complete
         waitForICEGathering() {
             return new Promise((resolve, reject) => {
                 if (this.peerConnection.iceGatheringState === 'complete') {
+                    console.log('ICE already complete, resolving immediately');
                     resolve();
                     return;
                 }
                 
-                const timeout = setTimeout(() => {
-                    reject(new Error('ICE gathering timeout'));
+                console.log('Waiting for ICE gathering - current state:', this.peerConnection.iceGatheringState);
+                
+                let timeoutHandle;
+                let eventHandler;
+                
+                const cleanup = () => {
+                    clearTimeout(timeoutHandle);
+                    if (eventHandler && this.peerConnection) {
+                        this.peerConnection.removeEventListener('icegatheringstatechange', eventHandler);
+                    }
+                };
+                
+                timeoutHandle = setTimeout(() => {
+                    cleanup();
+                    const state = this.peerConnection ? this.peerConnection.iceGatheringState : 'closed';
+                    console.warn('ICE gathering timeout - state:', state);
+                    reject(new Error(`ICE gathering timeout (state: ${state})`));
                 }, this.ICE_GATHERING_TIMEOUT);
                 
-                this.peerConnection.addEventListener('icegatheringstatechange', () => {
-                    if (this.peerConnection.iceGatheringState === 'complete') {
-                        clearTimeout(timeout);
+                eventHandler = () => {
+                    if (this.peerConnection && this.peerConnection.iceGatheringState === 'complete') {
+                        console.log('ICE gathering complete');
+                        cleanup();
                         resolve();
                     }
-                });
+                };
+                
+                if (this.peerConnection) {
+                    this.peerConnection.addEventListener('icegatheringstatechange', eventHandler);
+                }
             });
         },
         
