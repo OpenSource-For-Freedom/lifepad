@@ -12,6 +12,7 @@
         currentSize: 4,
         currentTexture: 'ink',
         isEraser: false,
+        alpha: 1,
         isDrawing: false,
         lastX: 0,
         lastY: 0,
@@ -58,11 +59,28 @@
         bgImage: null,       // Loaded background image
         bgImageLoaded: false,
         // Menu state
-        menuCollapsed: false // Whether the navbar is collapsed
+        menuCollapsed: false, // Whether the navbar is collapsed
+        // Color lab state
+        currentPalette: [],
+        savedPalettes: [],
+        recentColors: [],
+        gradientStops: [],
+        gradientInterpolation: 'rgb',
+        selectedGradientStop: 0,
+        lastColorTab: 'basic'
     };
     
     // UI Constants
     const BUTTON_RESET_DELAY = 3000; // Time in ms before resetting button text after feedback
+    const STORAGE_KEYS = {
+        alpha: 'lifepad-alpha',
+        palette: 'lifepad-current-palette',
+        savedPalettes: 'lifepad-saved-palettes',
+        recent: 'lifepad-recent-colors',
+        tab: 'lifepad-color-tab',
+        gradient: 'lifepad-gradient-stops',
+        gradientMode: 'lifepad-gradient-mode'
+    };
     
     // Selection and hit detection constants
     const SHAPE_HIT_TOLERANCE = 5; // Pixels of tolerance for shape boundary hit detection
@@ -77,14 +95,44 @@
 
     // Color utility functions
     const ColorUtils = {
+        clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        },
+
+        normalizeHex(hex) {
+            if (!hex) return null;
+            let h = hex.trim().toLowerCase();
+            if (!h.startsWith('#')) h = '#' + h;
+            if (h.length === 4 || h.length === 5) {
+                // #rgb or #rgba -> expand
+                const r = h[1], g = h[2], b = h[3], a = h[4];
+                h = '#' + r + r + g + g + b + b + (a ? a + a : '');
+            }
+            if (h.length === 7 || h.length === 9) return h;
+            return null;
+        },
+
         // Convert hex color to RGB
         hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            const norm = this.normalizeHex(hex);
+            const result = norm ? /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(norm) : null;
             return result ? {
                 r: parseInt(result[1], 16),
                 g: parseInt(result[2], 16),
                 b: parseInt(result[3], 16)
             } : null;
+        },
+
+        hexToRgba(hex) {
+            const norm = this.normalizeHex(hex);
+            if (!norm) return null;
+            const rgb = this.hexToRgb(norm);
+            if (!rgb) return null;
+            let a = 1;
+            if (norm.length === 9) {
+                a = parseInt(norm.slice(7, 9), 16) / 255;
+            }
+            return { r: rgb.r, g: rgb.g, b: rgb.b, a };
         },
 
         // Convert RGB to hex
@@ -93,6 +141,12 @@
                 const hex = Math.round(x).toString(16);
                 return hex.length === 1 ? '0' + hex : hex;
             }).join('');
+        },
+
+        rgbToHexAlpha(r, g, b, a = 1) {
+            const base = this.rgbToHex(r, g, b);
+            const alphaHex = Math.round(this.clamp(a, 0, 1) * 255).toString(16).padStart(2, '0');
+            return a >= 1 ? base : base + alphaHex;
         },
 
         // Convert RGB to HSL
@@ -164,7 +218,21 @@
 
             const newRgb = this.hslToRgb(hsl.h, hsl.s, hsl.l);
             return this.rgbToHex(newRgb.r, newRgb.g, newRgb.b);
+        },
+
+        toRgbaString(hex, alpha = 1) {
+            const rgb = this.hexToRgb(hex);
+            if (!rgb) return hex;
+            const a = this.clamp(alpha, 0, 1);
+            if (a >= 0.999) return this.normalizeHex(hex);
+            return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a.toFixed(2)})`;
         }
+    };
+
+    const advancedColorState = {
+        h: 210,
+        s: 80,
+        l: 50
     };
 
     // DOM elements
@@ -194,6 +262,16 @@
     let bgImageInput;
     // Menu toggle element
     let menuToggleBtn;
+    // Color lab elements
+    let advancedColorToggle, advancedColorPanel, advancedColorBackdrop, closeAdvancedPanelBtn;
+    let tabBasicBtn, tabAdvancedBtn;
+    let colorWheelCanvas, colorWheelCtx, colorWheelIndicator, lightnessSlider, lightnessValue, gradientSwatches, advancedColorChip;
+    let inspectorHexInput, inspectorRInput, inspectorGInput, inspectorBInput, inspectorHInput, inspectorSInput, inspectorLInput, inspectorAlphaInput;
+    let copyHexBtn, copyRgbBtn;
+    let harmonyModeSelect, harmonySwatches, harmonyAddAllBtn;
+    let currentPaletteList, paletteAddCurrentBtn, paletteClearBtn, paletteNameInput, paletteSaveBtn, paletteSavedSelect, paletteLoadBtn, paletteDeleteBtn, paletteExportBtn, paletteImportBtn, paletteImportInput, recentColorsRow;
+    let gradientPreview, gradientStopsContainer, gradientAddStopBtn, gradientDeleteStopBtn, gradientAddToPaletteBtn, gradientSetPrimaryBtn, gradientInterpSelect;
+    let extractImageBtn, extractImageInput, extractSwatches, extractCountSelect;
     // Collaboration elements
     let collabBtn, collabModal, closeCollabModal, collabStatus, collabError;
     let hostTabBtn, joinTabBtn, hostTab, joinTab;
@@ -204,6 +282,8 @@
     let collabEnabled = false;
     // Connection success modal elements
     let connectionSuccessModal, closeConnectionSuccess, localNameDisplay, remoteNameDisplay;
+
+    let isColorWheelDragging = false;
 
     // Initialize app
     function init() {
@@ -282,6 +362,57 @@
         
         // Background image input
         bgImageInput = document.getElementById('bg-image-input');
+
+        // Color lab
+        menuToggleBtn = document.getElementById('menu-toggle');
+        advancedColorToggle = document.getElementById('advanced-color-toggle');
+        advancedColorPanel = document.getElementById('advanced-color-panel');
+        advancedColorBackdrop = document.getElementById('advanced-color-backdrop');
+        closeAdvancedPanelBtn = document.getElementById('close-advanced-panel');
+        tabBasicBtn = document.getElementById('tab-basic-btn');
+        tabAdvancedBtn = document.getElementById('tab-advanced-btn');
+        colorWheelCanvas = document.getElementById('color-wheel-canvas');
+        colorWheelIndicator = document.getElementById('color-wheel-indicator');
+        lightnessSlider = document.getElementById('lightness-slider');
+        lightnessValue = document.getElementById('lightness-value');
+        advancedColorChip = document.getElementById('advanced-current-chip');
+        gradientSwatches = Array.from(document.querySelectorAll('.gradient-swatch'));
+        inspectorHexInput = document.getElementById('inspector-hex');
+        inspectorRInput = document.getElementById('inspector-r');
+        inspectorGInput = document.getElementById('inspector-g');
+        inspectorBInput = document.getElementById('inspector-b');
+        inspectorHInput = document.getElementById('inspector-h');
+        inspectorSInput = document.getElementById('inspector-s');
+        inspectorLInput = document.getElementById('inspector-l');
+        inspectorAlphaInput = document.getElementById('inspector-a');
+        copyHexBtn = document.getElementById('copy-hex-btn');
+        copyRgbBtn = document.getElementById('copy-rgb-btn');
+        harmonyModeSelect = document.getElementById('harmony-mode');
+        harmonySwatches = document.getElementById('harmony-swatches');
+        harmonyAddAllBtn = document.getElementById('harmony-add-all');
+        currentPaletteList = document.getElementById('current-palette-list');
+        paletteAddCurrentBtn = document.getElementById('palette-add-current');
+        paletteClearBtn = document.getElementById('palette-clear');
+        paletteNameInput = document.getElementById('palette-name');
+        paletteSaveBtn = document.getElementById('palette-save');
+        paletteSavedSelect = document.getElementById('palette-saved');
+        paletteLoadBtn = document.getElementById('palette-load');
+        paletteDeleteBtn = document.getElementById('palette-delete');
+        paletteExportBtn = document.getElementById('palette-export');
+        paletteImportBtn = document.getElementById('palette-import');
+        paletteImportInput = document.getElementById('palette-import-input');
+        recentColorsRow = document.getElementById('recent-colors');
+        gradientPreview = document.getElementById('gradient-preview');
+        gradientStopsContainer = document.getElementById('gradient-stops');
+        gradientAddStopBtn = document.getElementById('gradient-add-stop');
+        gradientDeleteStopBtn = document.getElementById('gradient-delete-stop');
+        gradientAddToPaletteBtn = document.getElementById('gradient-add-to-palette');
+        gradientSetPrimaryBtn = document.getElementById('gradient-set-primary');
+        gradientInterpSelect = document.getElementById('gradient-interp');
+        extractImageBtn = document.getElementById('extract-image-btn');
+        extractImageInput = document.getElementById('extract-image-input');
+        extractSwatches = document.getElementById('extract-swatches');
+        extractCountSelect = document.getElementById('extract-count');
         
         // Collaboration elements
         collabBtn = document.getElementById('collab-btn');
@@ -324,6 +455,22 @@
         // Menu toggle element
         menuToggleBtn = document.getElementById('menu-toggle');
 
+        // Advanced color panel elements
+        advancedColorToggle = document.getElementById('advanced-color-toggle');
+        advancedColorPanel = document.getElementById('advanced-color-panel');
+        advancedColorBackdrop = document.getElementById('advanced-color-backdrop');
+        closeAdvancedPanelBtn = document.getElementById('close-advanced-panel');
+        colorWheelCanvas = document.getElementById('color-wheel-canvas');
+        colorWheelIndicator = document.getElementById('color-wheel-indicator');
+        lightnessSlider = document.getElementById('lightness-slider');
+        lightnessValue = document.getElementById('lightness-value');
+        advancedColorChip = document.getElementById('advanced-current-chip');
+        gradientSwatches = Array.from(document.querySelectorAll('.gradient-swatch'));
+
+        if (colorWheelCanvas) {
+            colorWheelCtx = colorWheelCanvas.getContext('2d');
+        }
+
         // Setup canvas
         setupCanvas();
         
@@ -332,6 +479,15 @@
         
         // Load saved state
         loadState();
+
+        // Sync advanced color lab UI after state load
+        renderCurrentPalette();
+        renderSavedPalettes();
+        renderRecentColors();
+        renderGradient();
+        renderHarmony();
+        updateInspectorFields();
+        switchColorTab(state.lastColorTab);
         
         // Setup event listeners
         setupEventListeners();
@@ -341,6 +497,9 @@
         
         // Register service worker
         registerServiceWorker();
+
+        // Prepare advanced color lab visuals
+        initAdvancedColorLab();
     }
 
     // Setup canvas with high DPI support
@@ -486,6 +645,156 @@
             }
         });
 
+        // Advanced color panel
+        if (advancedColorToggle) {
+            advancedColorToggle.addEventListener('click', openAdvancedColorPanel);
+        }
+        if (closeAdvancedPanelBtn) {
+            closeAdvancedPanelBtn.addEventListener('click', closeAdvancedColorPanel);
+        }
+        if (colorWheelCanvas) {
+            colorWheelCanvas.addEventListener('pointerdown', function(e) {
+                isColorWheelDragging = true;
+                handleColorWheelPointer(e);
+                colorWheelCanvas.setPointerCapture(e.pointerId);
+            });
+            colorWheelCanvas.addEventListener('pointermove', function(e) {
+                if (isColorWheelDragging) {
+                    handleColorWheelPointer(e);
+                }
+            });
+            colorWheelCanvas.addEventListener('pointerup', function(e) {
+                isColorWheelDragging = false;
+                colorWheelCanvas.releasePointerCapture(e.pointerId);
+            });
+            colorWheelCanvas.addEventListener('pointerleave', function() {
+                isColorWheelDragging = false;
+            });
+        }
+        if (lightnessSlider) {
+            lightnessSlider.addEventListener('input', function() {
+                const val = parseInt(this.value);
+                if (isNaN(val)) return;
+                advancedColorState.l = val;
+                lightnessValue.textContent = val + '%';
+                drawColorWheel();
+                setAdvancedColorFromHSL(advancedColorState.h, advancedColorState.s, advancedColorState.l);
+            });
+        }
+        if (gradientSwatches && gradientSwatches.length) {
+            gradientSwatches.forEach(btn => {
+                const gradient = btn.dataset.gradient;
+                if (gradient) {
+                    btn.style.background = `linear-gradient(135deg, ${gradient})`;
+                }
+                btn.addEventListener('click', () => {
+                    if (!gradient) return;
+                    const parts = gradient.split(',');
+                    if (parts.length < 2) return;
+                    const blended = mixHexColors(parts[0], parts[1], 0.5);
+                    const rgb = ColorUtils.hexToRgb(blended);
+                    if (!rgb) return;
+                    const hsl = ColorUtils.rgbToHsl(rgb.r, rgb.g, rgb.b);
+                    lightnessSlider.value = Math.round(hsl.l);
+                    lightnessValue.textContent = Math.round(hsl.l) + '%';
+                    drawColorWheel();
+                    setAdvancedColorFromHSL(hsl.h, hsl.s, hsl.l);
+                });
+            });
+        }
+
+        if (tabBasicBtn && tabAdvancedBtn) {
+            tabBasicBtn.addEventListener('click', () => switchColorTab('basic'));
+            tabAdvancedBtn.addEventListener('click', () => switchColorTab('advanced'));
+        }
+        if (inspectorHexInput) {
+            inspectorHexInput.addEventListener('change', applyInspectorHex);
+            inspectorHexInput.addEventListener('blur', applyInspectorHex);
+        }
+        if (inspectorRInput && inspectorGInput && inspectorBInput) {
+            [inspectorRInput, inspectorGInput, inspectorBInput].forEach(inp => {
+                inp.addEventListener('change', applyInspectorRgb);
+                inp.addEventListener('blur', applyInspectorRgb);
+            });
+        }
+        if (inspectorHInput && inspectorSInput && inspectorLInput) {
+            [inspectorHInput, inspectorSInput, inspectorLInput].forEach(inp => {
+                inp.addEventListener('change', applyInspectorHsl);
+                inp.addEventListener('blur', applyInspectorHsl);
+            });
+        }
+        if (inspectorAlphaInput) {
+            inspectorAlphaInput.addEventListener('input', applyInspectorAlpha);
+            inspectorAlphaInput.addEventListener('change', applyInspectorAlpha);
+        }
+        if (copyHexBtn) {
+            copyHexBtn.addEventListener('click', () => copyToClipboardText(inspectorHexInput.value, 'HEX copied'));
+        }
+        if (copyRgbBtn) {
+            copyRgbBtn.addEventListener('click', () => {
+                const r = inspectorRInput.value || 0;
+                const g = inspectorGInput.value || 0;
+                const b = inspectorBInput.value || 0;
+                copyToClipboardText(`rgb(${r}, ${g}, ${b})`, 'RGB copied');
+            });
+        }
+        if (harmonyModeSelect) {
+            harmonyModeSelect.addEventListener('change', renderHarmony);
+        }
+        if (harmonyAddAllBtn) {
+            harmonyAddAllBtn.addEventListener('click', () => {
+                const baseHex = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+                const mode = harmonyModeSelect ? harmonyModeSelect.value : 'complementary';
+                const colors = generateHarmonyColors(mode, baseHex);
+                colors.forEach(c => addColorToPalette(c, state.alpha));
+            });
+        }
+        if (paletteAddCurrentBtn) {
+            paletteAddCurrentBtn.addEventListener('click', () => addColorToPalette(ColorUtils.shiftHue(state.baseColor, state.hueShift), state.alpha));
+        }
+        if (paletteClearBtn) {
+            paletteClearBtn.addEventListener('click', clearCurrentPalette);
+        }
+        if (paletteSaveBtn) {
+            paletteSaveBtn.addEventListener('click', saveCurrentPalette);
+        }
+        if (paletteLoadBtn) {
+            paletteLoadBtn.addEventListener('click', loadSelectedPalette);
+        }
+        if (paletteDeleteBtn) {
+            paletteDeleteBtn.addEventListener('click', deleteSelectedPalette);
+        }
+        if (paletteExportBtn) {
+            paletteExportBtn.addEventListener('click', exportPalette);
+        }
+        if (paletteImportBtn && paletteImportInput) {
+            paletteImportBtn.addEventListener('click', () => paletteImportInput.click());
+            paletteImportInput.addEventListener('change', e => {
+                const file = e.target.files[0];
+                importPalettesFromFile(file);
+                e.target.value = '';
+            });
+        }
+        if (gradientAddStopBtn) gradientAddStopBtn.addEventListener('click', addGradientStop);
+        if (gradientDeleteStopBtn) gradientDeleteStopBtn.addEventListener('click', deleteGradientStop);
+        if (gradientAddToPaletteBtn) gradientAddToPaletteBtn.addEventListener('click', addGradientToPalette);
+        if (gradientSetPrimaryBtn) gradientSetPrimaryBtn.addEventListener('click', setGradientPrimarySecondary);
+        if (gradientInterpSelect) {
+            gradientInterpSelect.addEventListener('change', () => {
+                state.gradientInterpolation = gradientInterpSelect.value;
+                localStorage.setItem(STORAGE_KEYS.gradientMode, state.gradientInterpolation);
+                renderGradient();
+            });
+        }
+        if (extractImageBtn && extractImageInput) {
+            extractImageBtn.addEventListener('click', () => extractImageInput.click());
+            extractImageInput.addEventListener('change', e => {
+                const file = e.target.files[0];
+                handleImageExtract(file);
+                e.target.value = '';
+            });
+        }
+
         // Color selection
         colorSwatches.forEach(swatch => {
             swatch.addEventListener('click', function() {
@@ -514,6 +823,8 @@
             hueShiftValue.textContent = this.value + '°';
             updateCurrentColor();
             updateColorSwatchesDisplay();
+            updateInspectorFields();
+            renderHarmony();
             localStorage.setItem('lifepad-hue-shift', state.hueShift);
         });
 
@@ -647,9 +958,28 @@
     }
 
     // Color selection
-    function selectColor(color) {
-        state.baseColor = color;
+    function setActiveColor(color, alpha = state.alpha) {
+        const normalized = ColorUtils.normalizeHex(color);
+        if (!normalized) return;
+        state.baseColor = normalized;
+        state.alpha = ColorUtils.clamp(alpha, 0, 1);
+        persist(STORAGE_KEYS.alpha, state.alpha);
         updateCurrentColor();
+        if (customColorPicker) {
+            customColorPicker.value = normalized;
+        }
+        if (advancedColorChip) {
+            advancedColorChip.style.background = ColorUtils.toRgbaString(normalized, state.alpha);
+        }
+        addRecentColor(normalized, state.alpha);
+        updateSelectedGradientStopColor(normalized, state.alpha);
+        updateInspectorFields();
+        renderHarmony();
+        renderGradient();
+    }
+
+    function selectColor(color, alpha) {
+        setActiveColor(color, alpha === undefined ? state.alpha : alpha);
         state.isEraser = false;
         brushEraserToggle.textContent = 'Brush';
         brushEraserToggle.classList.remove('active');
@@ -657,7 +987,696 @@
 
     function updateCurrentColor() {
         // Apply hue shift to base color
-        state.currentColor = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        const shifted = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        state.currentColor = ColorUtils.toRgbaString(shifted, state.alpha);
+    }
+
+    function setAdvancedColorFromHSL(h, s, l) {
+        advancedColorState.h = h;
+        advancedColorState.s = s;
+        advancedColorState.l = l;
+        const rgb = ColorUtils.hslToRgb(h, s, l);
+        const hex = ColorUtils.rgbToHex(rgb.r, rgb.g, rgb.b);
+        selectColor(hex);
+        if (customColorPicker) {
+            customColorPicker.value = hex;
+        }
+        if (advancedColorChip) {
+            advancedColorChip.style.background = hex;
+        }
+        positionColorWheelIndicator();
+    }
+
+    function drawColorWheel() {
+        if (!colorWheelCtx || !colorWheelCanvas) return;
+        const { width, height } = colorWheelCanvas;
+        const cx = width / 2;
+        const cy = height / 2;
+        const radius = Math.min(cx, cy) - 1;
+        const imageData = colorWheelCtx.createImageData(width, height);
+        const data = imageData.data;
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const dx = x - cx;
+                const dy = y - cy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const idx = (y * width + x) * 4;
+                if (dist > radius) {
+                    data[idx + 3] = 0;
+                    continue;
+                }
+                const sat = Math.min(dist / radius, 1) * 100;
+                let hue = Math.atan2(dy, dx) * (180 / Math.PI);
+                hue = (hue + 360) % 360;
+                const rgb = ColorUtils.hslToRgb(hue, sat, advancedColorState.l);
+                data[idx] = rgb.r;
+                data[idx + 1] = rgb.g;
+                data[idx + 2] = rgb.b;
+                data[idx + 3] = 255;
+            }
+        }
+        colorWheelCtx.putImageData(imageData, 0, 0);
+    }
+
+    function positionColorWheelIndicator() {
+        if (!colorWheelIndicator || !colorWheelCanvas) return;
+        const rect = colorWheelCanvas.getBoundingClientRect();
+        const radius = Math.min(rect.width, rect.height) / 2;
+        const satRatio = Math.min(advancedColorState.s / 100, 1);
+        const angle = (advancedColorState.h * Math.PI) / 180;
+        const x = radius + Math.cos(angle) * radius * satRatio;
+        const y = radius + Math.sin(angle) * radius * satRatio;
+        colorWheelIndicator.style.left = `${x}px`;
+        colorWheelIndicator.style.top = `${y}px`;
+    }
+
+    function handleColorWheelPointer(e) {
+        if (!colorWheelCanvas) return;
+        const rect = colorWheelCanvas.getBoundingClientRect();
+        const cx = rect.width / 2;
+        const cy = rect.height / 2;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const dx = x - cx;
+        const dy = y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const radius = Math.min(cx, cy);
+        if (dist > radius) return;
+        let hue = Math.atan2(dy, dx) * (180 / Math.PI);
+        hue = (hue + 360) % 360;
+        const sat = Math.min(dist / radius, 1) * 100;
+        setAdvancedColorFromHSL(hue, sat, advancedColorState.l);
+    }
+
+    function openAdvancedColorPanel() {
+        if (!advancedColorPanel) return;
+        advancedColorPanel.classList.remove('hidden');
+        advancedColorPanel.classList.add('show');
+        advancedColorPanel.setAttribute('aria-hidden', 'false');
+        drawColorWheel();
+        positionColorWheelIndicator();
+    }
+
+    function closeAdvancedColorPanel() {
+        if (!advancedColorPanel) return;
+        advancedColorPanel.classList.remove('show');
+        advancedColorPanel.classList.add('hidden');
+        advancedColorPanel.setAttribute('aria-hidden', 'true');
+        isColorWheelDragging = false;
+    }
+
+    function initAdvancedColorLab() {
+        if (lightnessSlider && lightnessValue) {
+            lightnessValue.textContent = lightnessSlider.value + '%';
+            const parsed = parseInt(lightnessSlider.value);
+            if (!isNaN(parsed)) {
+                advancedColorState.l = parsed;
+            }
+        }
+
+        const rgb = ColorUtils.hexToRgb(state.baseColor);
+        if (rgb) {
+            const hsl = ColorUtils.rgbToHsl(rgb.r, rgb.g, rgb.b);
+            advancedColorState.h = hsl.h;
+            advancedColorState.s = hsl.s;
+            advancedColorState.l = hsl.l;
+            if (lightnessSlider && lightnessValue) {
+                lightnessSlider.value = Math.round(hsl.l);
+                lightnessValue.textContent = Math.round(hsl.l) + '%';
+            }
+        }
+
+        drawColorWheel();
+        positionColorWheelIndicator();
+        if (advancedColorChip) {
+            advancedColorChip.style.background = state.currentColor;
+        }
+    }
+
+    function mixHexColors(hexA, hexB, ratio = 0.5) {
+        const a = ColorUtils.hexToRgb(hexA);
+        const b = ColorUtils.hexToRgb(hexB);
+        if (!a || !b) return hexA;
+        const r = a.r + (b.r - a.r) * ratio;
+        const g = a.g + (b.g - a.g) * ratio;
+        const bVal = a.b + (b.b - a.b) * ratio;
+        return ColorUtils.rgbToHex(r, g, bVal);
+    }
+
+    function ensureDefaultGradientStops() {
+        if (!state.gradientStops || state.gradientStops.length < 2) {
+            state.gradientStops = [
+                { position: 0, hex: '#ff5f6d', a: 1 },
+                { position: 1, hex: '#ffc371', a: 1 }
+            ];
+        }
+        state.selectedGradientStop = Math.min(state.selectedGradientStop || 0, state.gradientStops.length - 1);
+    }
+
+    function persist(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.warn('Persist failed', key, e);
+        }
+    }
+
+    function addRecentColor(hex, alpha = 1) {
+        const entry = { hex: ColorUtils.normalizeHex(hex), a: ColorUtils.clamp(alpha, 0, 1) };
+        if (!entry.hex) return;
+        state.recentColors = state.recentColors.filter(c => !(c.hex === entry.hex && Math.abs((c.a || 1) - entry.a) < 0.001));
+        state.recentColors.unshift(entry);
+        if (state.recentColors.length > 20) state.recentColors = state.recentColors.slice(0, 20);
+        persist(STORAGE_KEYS.recent, state.recentColors);
+        renderRecentColors();
+    }
+
+    function renderRecentColors() {
+        if (!recentColorsRow) return;
+        recentColorsRow.innerHTML = '';
+        state.recentColors.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'swatch swatch-button';
+            btn.style.background = ColorUtils.toRgbaString(item.hex, item.a);
+            btn.title = `${item.hex} (${Math.round((item.a || 1) * 100)}%)`;
+            btn.addEventListener('click', () => selectColor(item.hex, item.a));
+            recentColorsRow.appendChild(btn);
+        });
+    }
+
+    function updateInspectorFields() {
+        if (!inspectorHexInput) return;
+        const shifted = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        const rgb = ColorUtils.hexToRgb(shifted);
+        if (!rgb) return;
+        const hsl = ColorUtils.rgbToHsl(rgb.r, rgb.g, rgb.b);
+        inspectorHexInput.value = shifted;
+        inspectorRInput.value = Math.round(rgb.r);
+        inspectorGInput.value = Math.round(rgb.g);
+        inspectorBInput.value = Math.round(rgb.b);
+        inspectorHInput.value = Math.round(hsl.h);
+        inspectorSInput.value = Math.round(hsl.s);
+        inspectorLInput.value = Math.round(hsl.l);
+        inspectorAlphaInput.value = state.alpha.toFixed(2);
+    }
+
+    function applyInspectorHex() {
+        const val = inspectorHexInput.value.trim();
+        const norm = ColorUtils.normalizeHex(val);
+        if (norm) {
+            setActiveColor(norm, state.alpha);
+            persist(STORAGE_KEYS.alpha, state.alpha);
+        }
+    }
+
+    function applyInspectorRgb() {
+        const r = parseInt(inspectorRInput.value, 10);
+        const g = parseInt(inspectorGInput.value, 10);
+        const b = parseInt(inspectorBInput.value, 10);
+        if ([r, g, b].some(v => isNaN(v))) return;
+        const clampedR = ColorUtils.clamp(r, 0, 255);
+        const clampedG = ColorUtils.clamp(g, 0, 255);
+        const clampedB = ColorUtils.clamp(b, 0, 255);
+        const hex = ColorUtils.rgbToHex(clampedR, clampedG, clampedB);
+        setActiveColor(hex, state.alpha);
+        persist(STORAGE_KEYS.alpha, state.alpha);
+    }
+
+    function applyInspectorHsl() {
+        const h = parseFloat(inspectorHInput.value);
+        const s = parseFloat(inspectorSInput.value);
+        const l = parseFloat(inspectorLInput.value);
+        if ([h, s, l].some(v => isNaN(v))) return;
+        const rgb = ColorUtils.hslToRgb(ColorUtils.clamp(h, 0, 360), ColorUtils.clamp(s, 0, 100), ColorUtils.clamp(l, 0, 100));
+        const hex = ColorUtils.rgbToHex(rgb.r, rgb.g, rgb.b);
+        setActiveColor(hex, state.alpha);
+        persist(STORAGE_KEYS.alpha, state.alpha);
+    }
+
+    function applyInspectorAlpha() {
+        const a = parseFloat(inspectorAlphaInput.value);
+        if (isNaN(a)) return;
+        state.alpha = ColorUtils.clamp(a, 0, 1);
+        persist(STORAGE_KEYS.alpha, state.alpha);
+        updateCurrentColor();
+        updateSelectedGradientStopColor(state.baseColor, state.alpha);
+        updateInspectorFields();
+    }
+
+    function copyToClipboardText(text, successMsg) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(successMsg);
+        }).catch(() => {
+            showToast('Copy failed');
+        });
+    }
+
+    function switchColorTab(tab) {
+        if (!advancedColorPanel) return;
+        const basicPanel = document.getElementById('advanced-tab-basic');
+        const advPanel = document.getElementById('advanced-tab-advanced');
+        if (!basicPanel || !advPanel) return;
+        if (tab === 'advanced') {
+            basicPanel.classList.remove('active');
+            advPanel.classList.add('active');
+            if (tabBasicBtn && tabAdvancedBtn) {
+                tabBasicBtn.classList.remove('active');
+                tabAdvancedBtn.classList.add('active');
+            }
+            state.lastColorTab = 'advanced';
+        } else {
+            basicPanel.classList.add('active');
+            advPanel.classList.remove('active');
+            if (tabBasicBtn && tabAdvancedBtn) {
+                tabBasicBtn.classList.add('active');
+                tabAdvancedBtn.classList.remove('active');
+            }
+            state.lastColorTab = 'basic';
+        }
+        persist(STORAGE_KEYS.tab, state.lastColorTab);
+    }
+
+    function generateHarmonyColors(mode, baseHex) {
+        const rgb = ColorUtils.hexToRgb(baseHex);
+        if (!rgb) return [];
+        const base = ColorUtils.rgbToHsl(rgb.r, rgb.g, rgb.b);
+        const colors = [];
+        const pushH = (h, s = base.s, l = base.l) => {
+            const rgbVal = ColorUtils.hslToRgb((h + 360) % 360, s, l);
+            colors.push(ColorUtils.rgbToHex(rgbVal.r, rgbVal.g, rgbVal.b));
+        };
+        switch (mode) {
+            case 'complementary':
+                pushH(base.h);
+                pushH(base.h + 180);
+                break;
+            case 'analogous':
+                [-30, 0, 30, 60, -60].forEach(d => pushH(base.h + d));
+                break;
+            case 'split-complementary':
+                pushH(base.h);
+                pushH(base.h + 150);
+                pushH(base.h - 150);
+                break;
+            case 'triadic':
+                pushH(base.h);
+                pushH(base.h + 120);
+                pushH(base.h + 240);
+                break;
+            case 'tetradic':
+                [0, 90, 180, 270].forEach(d => pushH(base.h + d));
+                break;
+            case 'monochrome':
+                const steps = [-30, -15, 0, 15, 30];
+                steps.forEach(d => pushH(base.h, base.s, ColorUtils.clamp(base.l + d, 0, 100)));
+                break;
+            default:
+                pushH(base.h);
+        }
+        return colors;
+    }
+
+    function renderHarmony() {
+        if (!harmonySwatches) return;
+        const baseHex = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        const mode = harmonyModeSelect ? harmonyModeSelect.value : 'complementary';
+        const colors = generateHarmonyColors(mode, baseHex);
+        harmonySwatches.innerHTML = '';
+        colors.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'swatch swatch-button';
+            btn.style.background = ColorUtils.toRgbaString(c, 1);
+            btn.title = c;
+            btn.addEventListener('click', () => selectColor(c, state.alpha));
+            harmonySwatches.appendChild(btn);
+        });
+    }
+
+    function addColorToPalette(hex, alpha = 1) {
+        const norm = ColorUtils.normalizeHex(hex);
+        if (!norm) return;
+        state.currentPalette.push({ hex: norm, a: ColorUtils.clamp(alpha, 0, 1) });
+        persist(STORAGE_KEYS.palette, state.currentPalette);
+        renderCurrentPalette();
+    }
+
+    function removePaletteIndex(index) {
+        state.currentPalette.splice(index, 1);
+        persist(STORAGE_KEYS.palette, state.currentPalette);
+        renderCurrentPalette();
+    }
+
+    function movePaletteIndex(index, delta) {
+        const target = index + delta;
+        if (target < 0 || target >= state.currentPalette.length) return;
+        const [item] = state.currentPalette.splice(index, 1);
+        state.currentPalette.splice(target, 0, item);
+        persist(STORAGE_KEYS.palette, state.currentPalette);
+        renderCurrentPalette();
+    }
+
+    function clearCurrentPalette() {
+        state.currentPalette = [];
+        persist(STORAGE_KEYS.palette, state.currentPalette);
+        renderCurrentPalette();
+    }
+
+    function renderCurrentPalette() {
+        if (!currentPaletteList) return;
+        currentPaletteList.innerHTML = '';
+        state.currentPalette.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'palette-swatch-item';
+            const swatch = document.createElement('button');
+            swatch.className = 'swatch-button';
+            swatch.style.background = ColorUtils.toRgbaString(item.hex, item.a);
+            swatch.title = `${item.hex}`;
+            swatch.addEventListener('click', () => selectColor(item.hex, item.a));
+
+            const controls = document.createElement('div');
+            controls.className = 'palette-swatch-controls';
+            const up = document.createElement('button');
+            up.className = 'mini-btn';
+            up.textContent = '↑';
+            up.title = 'Move up';
+            up.addEventListener('click', () => movePaletteIndex(index, -1));
+            const down = document.createElement('button');
+            down.className = 'mini-btn';
+            down.textContent = '↓';
+            down.title = 'Move down';
+            down.addEventListener('click', () => movePaletteIndex(index, 1));
+            const remove = document.createElement('button');
+            remove.className = 'mini-btn';
+            remove.textContent = '✕';
+            remove.title = 'Remove swatch';
+            remove.addEventListener('click', () => removePaletteIndex(index));
+
+            controls.append(up, down, remove);
+            row.append(swatch, controls);
+            currentPaletteList.appendChild(row);
+        });
+    }
+
+    function renderSavedPalettes() {
+        if (!paletteSavedSelect) return;
+        paletteSavedSelect.innerHTML = '';
+        state.savedPalettes.forEach((pal, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = `${pal.name} (${pal.colors.length})`;
+            paletteSavedSelect.appendChild(opt);
+        });
+    }
+
+    function saveCurrentPalette() {
+        const name = (paletteNameInput?.value || '').trim() || `Palette ${state.savedPalettes.length + 1}`;
+        const palette = { name, colors: [...state.currentPalette], createdAt: Date.now() };
+        state.savedPalettes.push(palette);
+        persist(STORAGE_KEYS.savedPalettes, state.savedPalettes);
+        renderSavedPalettes();
+        showToast('Palette saved');
+    }
+
+    function loadSelectedPalette() {
+        if (!paletteSavedSelect) return;
+        const idx = parseInt(paletteSavedSelect.value, 10);
+        if (isNaN(idx) || !state.savedPalettes[idx]) return;
+        state.currentPalette = [...state.savedPalettes[idx].colors];
+        persist(STORAGE_KEYS.palette, state.currentPalette);
+        renderCurrentPalette();
+        showToast('Palette loaded');
+    }
+
+    function deleteSelectedPalette() {
+        if (!paletteSavedSelect) return;
+        const idx = parseInt(paletteSavedSelect.value, 10);
+        if (isNaN(idx) || !state.savedPalettes[idx]) return;
+        state.savedPalettes.splice(idx, 1);
+        persist(STORAGE_KEYS.savedPalettes, state.savedPalettes);
+        renderSavedPalettes();
+        showToast('Palette deleted');
+    }
+
+    function exportPalette() {
+        const idx = parseInt(paletteSavedSelect.value, 10);
+        const palette = (!isNaN(idx) && state.savedPalettes[idx]) ? state.savedPalettes[idx] : { name: 'Current', colors: state.currentPalette, createdAt: Date.now() };
+        const blob = new Blob([JSON.stringify(palette, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${palette.name.replace(/\s+/g, '-').toLowerCase()}-palette.json`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function importPalettesFromFile(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                const palettes = Array.isArray(parsed) ? parsed : [parsed];
+                palettes.forEach(p => {
+                    if (p && p.colors && Array.isArray(p.colors)) {
+                        state.savedPalettes.push({
+                            name: p.name || `Imported ${state.savedPalettes.length + 1}`,
+                            colors: p.colors,
+                            createdAt: p.createdAt || Date.now()
+                        });
+                    }
+                });
+                persist(STORAGE_KEYS.savedPalettes, state.savedPalettes);
+                renderSavedPalettes();
+                showToast('Palettes imported');
+            } catch (err) {
+                showToast('Invalid palette file');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function renderGradient() {
+        if (!gradientPreview) return;
+        const ctxGrad = gradientPreview.getContext('2d');
+        if (!gradientPreview.width || !gradientPreview.height) {
+            const rect = gradientPreview.getBoundingClientRect();
+            gradientPreview.width = Math.max(1, Math.round(rect.width || 260));
+            gradientPreview.height = Math.max(1, Math.round(rect.height || 40));
+        }
+        const w = gradientPreview.width;
+        const h = gradientPreview.height;
+        ctxGrad.clearRect(0, 0, w, h);
+        const stops = [...state.gradientStops].sort((a, b) => a.position - b.position);
+        if (state.gradientInterpolation === 'hsl') {
+            const imageData = ctxGrad.createImageData(w, h);
+            for (let x = 0; x < w; x++) {
+                const t = x / (w - 1);
+                const { hex, a } = sampleGradientAt(t, stops, true);
+                const rgb = ColorUtils.hexToRgb(hex);
+                for (let y = 0; y < h; y++) {
+                    const idx = (y * w + x) * 4;
+                    imageData.data[idx] = rgb.r;
+                    imageData.data[idx + 1] = rgb.g;
+                    imageData.data[idx + 2] = rgb.b;
+                    imageData.data[idx + 3] = Math.round((a || 1) * 255);
+                }
+            }
+            ctxGrad.putImageData(imageData, 0, 0);
+        } else {
+            const grad = ctxGrad.createLinearGradient(0, 0, w, 0);
+            stops.forEach(stop => {
+                grad.addColorStop(stop.position, ColorUtils.toRgbaString(stop.hex, stop.a));
+            });
+            ctxGrad.fillStyle = grad;
+            ctxGrad.fillRect(0, 0, w, h);
+        }
+        renderGradientStops();
+    }
+
+    function sampleGradientAt(t, stops, useHsl) {
+        const sorted = [...stops].sort((a, b) => a.position - b.position);
+        let left = sorted[0];
+        let right = sorted[sorted.length - 1];
+        for (let i = 0; i < sorted.length - 1; i++) {
+            if (t >= sorted[i].position && t <= sorted[i + 1].position) {
+                left = sorted[i];
+                right = sorted[i + 1];
+                break;
+            }
+        }
+        const span = Math.max(right.position - left.position, 0.0001);
+        const localT = ColorUtils.clamp((t - left.position) / span, 0, 1);
+        if (useHsl) {
+            const lRgbObj = ColorUtils.hexToRgb(left.hex);
+            const rRgbObj = ColorUtils.hexToRgb(right.hex);
+            if (!lRgbObj || !rRgbObj) return { hex: '#000000', a: 1 };
+            const lHsl = ColorUtils.rgbToHsl(lRgbObj.r, lRgbObj.g, lRgbObj.b);
+            const rHsl = ColorUtils.rgbToHsl(rRgbObj.r, rRgbObj.g, rRgbObj.b);
+            const h = lHsl.h + (rHsl.h - lHsl.h) * localT;
+            const s = lHsl.s + (rHsl.s - lHsl.s) * localT;
+            const l = lHsl.l + (rHsl.l - lHsl.l) * localT;
+            const rgb = ColorUtils.hslToRgb(h, s, l);
+            const a = (left.a || 1) + ((right.a || 1) - (left.a || 1)) * localT;
+            return { hex: ColorUtils.rgbToHex(rgb.r, rgb.g, rgb.b), a };
+        }
+        const lRgb = ColorUtils.hexToRgb(left.hex);
+        const rRgb = ColorUtils.hexToRgb(right.hex);
+        if (!lRgb || !rRgb) return { hex: '#000000', a: 1 };
+        const r = lRgb.r + (rRgb.r - lRgb.r) * localT;
+        const g = lRgb.g + (rRgb.g - lRgb.g) * localT;
+        const b = lRgb.b + (rRgb.b - lRgb.b) * localT;
+        const a = (left.a || 1) + ((right.a || 1) - (left.a || 1)) * localT;
+        return { hex: ColorUtils.rgbToHex(r, g, b), a };
+    }
+
+    function renderGradientStops() {
+        if (!gradientStopsContainer) return;
+        gradientStopsContainer.innerHTML = '';
+        state.gradientStops.sort((a, b) => a.position - b.position);
+        state.gradientStops.forEach((stop, index) => {
+            const row = document.createElement('div');
+            row.className = 'gradient-stop-item';
+            if (index === state.selectedGradientStop) {
+                row.style.outline = `2px solid ${ColorUtils.toRgbaString(stop.hex, stop.a)}`;
+            }
+            const chip = document.createElement('div');
+            chip.className = 'gradient-stop-color';
+            chip.style.background = ColorUtils.toRgbaString(stop.hex, stop.a);
+            chip.title = `${stop.hex}`;
+            chip.addEventListener('click', () => {
+                state.selectedGradientStop = index;
+                selectColor(stop.hex, stop.a);
+                renderGradientStops();
+            });
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.min = 0;
+            slider.max = 100;
+            slider.value = Math.round(stop.position * 100);
+            slider.addEventListener('input', () => {
+                stop.position = ColorUtils.clamp(slider.value / 100, 0, 1);
+                persist(STORAGE_KEYS.gradient, state.gradientStops);
+                renderGradient();
+            });
+            row.append(chip, slider);
+            gradientStopsContainer.appendChild(row);
+        });
+    }
+
+    function addGradientStop() {
+        const pos = 0.5;
+        const hex = ColorUtils.normalizeHex(ColorUtils.shiftHue(state.baseColor, state.hueShift));
+        state.gradientStops.push({ position: pos, hex, a: state.alpha });
+        state.selectedGradientStop = state.gradientStops.length - 1;
+        persist(STORAGE_KEYS.gradient, state.gradientStops);
+        renderGradient();
+    }
+
+    function deleteGradientStop() {
+        if (state.gradientStops.length <= 2) {
+            showToast('Keep at least two stops');
+            return;
+        }
+        state.gradientStops.splice(state.selectedGradientStop, 1);
+        state.selectedGradientStop = Math.max(0, state.selectedGradientStop - 1);
+        persist(STORAGE_KEYS.gradient, state.gradientStops);
+        renderGradient();
+    }
+
+    function addGradientToPalette() {
+        state.gradientStops.forEach(stop => addColorToPalette(stop.hex, stop.a));
+        showToast('Gradient stops added to palette');
+    }
+
+    function setGradientPrimarySecondary() {
+        if (state.gradientStops.length < 2) {
+            showToast('Need at least two stops');
+            return;
+        }
+        const sorted = [...state.gradientStops].sort((a, b) => a.position - b.position);
+        selectColor(sorted[0].hex, sorted[0].a);
+        addRecentColor(sorted[1].hex, sorted[1].a);
+        showToast('Primary set from first stop; second saved to recent');
+    }
+
+    function updateSelectedGradientStopColor(hex, alpha) {
+        if (state.selectedGradientStop === null || state.selectedGradientStop === undefined) return;
+        if (!state.gradientStops[state.selectedGradientStop]) return;
+        state.gradientStops[state.selectedGradientStop].hex = ColorUtils.normalizeHex(hex) || state.gradientStops[state.selectedGradientStop].hex;
+        state.gradientStops[state.selectedGradientStop].a = ColorUtils.clamp(alpha, 0, 1);
+        persist(STORAGE_KEYS.gradient, state.gradientStops);
+        renderGradient();
+    }
+
+    function handleImageExtract(file) {
+        if (!file) return;
+        const count = parseInt(extractCountSelect?.value || '6', 10);
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = e => {
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctxImg = canvas.getContext('2d');
+                const target = 80;
+                const ratio = img.width / img.height;
+                canvas.width = target;
+                canvas.height = Math.max(1, Math.round(target / ratio));
+                ctxImg.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const data = ctxImg.getImageData(0, 0, canvas.width, canvas.height).data;
+                const colors = extractKMeans(data, count);
+                renderExtractedColors(colors);
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function extractKMeans(data, k) {
+        const samples = [];
+        for (let i = 0; i < data.length; i += 16) {
+            samples.push([data[i], data[i + 1], data[i + 2]]);
+        }
+        k = Math.max(2, Math.min(k, samples.length));
+        let centers = [];
+        for (let i = 0; i < k; i++) centers.push(samples[Math.floor(Math.random() * samples.length)]);
+        for (let iter = 0; iter < 6; iter++) {
+            const clusters = Array.from({ length: k }, () => []);
+            samples.forEach(s => {
+                let best = 0;
+                let bestDist = Infinity;
+                centers.forEach((c, idx) => {
+                    const d = (s[0]-c[0])**2 + (s[1]-c[1])**2 + (s[2]-c[2])**2;
+                    if (d < bestDist) { bestDist = d; best = idx; }
+                });
+                clusters[best].push(s);
+            });
+            centers = clusters.map((cluster, idx) => {
+                if (!cluster.length) return centers[idx] || samples[0];
+                const sum = cluster.reduce((acc, c) => [acc[0]+c[0], acc[1]+c[1], acc[2]+c[2]], [0,0,0]);
+                return [sum[0]/cluster.length, sum[1]/cluster.length, sum[2]/cluster.length];
+            });
+        }
+        return centers.map(c => ColorUtils.rgbToHex(c[0], c[1], c[2]));
+    }
+
+    function renderExtractedColors(colors) {
+        if (!extractSwatches) return;
+        extractSwatches.innerHTML = '';
+        colors.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'swatch swatch-button';
+            btn.style.background = c;
+            btn.title = c;
+            btn.addEventListener('click', () => selectColor(c, state.alpha));
+            extractSwatches.appendChild(btn);
+        });
+        const addBtn = document.createElement('button');
+        addBtn.className = 'mini-btn';
+        addBtn.textContent = 'Add to Palette';
+        addBtn.addEventListener('click', () => {
+            colors.forEach(c => addColorToPalette(c, state.alpha));
+        });
+        extractSwatches.appendChild(addBtn);
     }
 
     function updateColorSwatchesDisplay() {
@@ -1653,6 +2672,18 @@
         else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
             e.preventDefault();
             resetZoom();
+        } else if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === '1') {
+            e.preventDefault();
+            switchColorTab('basic');
+        } else if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === '2') {
+            e.preventDefault();
+            switchColorTab('advanced');
+        } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
+            if (inspectorHexInput) {
+                e.preventDefault();
+                inspectorHexInput.focus();
+                inspectorHexInput.select();
+            }
         }
     }
 
@@ -1687,6 +2718,89 @@
                 updateColorSwatchesDisplay();
             }
         }
+
+        const savedAlpha = localStorage.getItem(STORAGE_KEYS.alpha);
+        if (savedAlpha !== null) {
+            const parsedAlpha = parseFloat(savedAlpha);
+            if (!isNaN(parsedAlpha)) {
+                state.alpha = ColorUtils.clamp(parsedAlpha, 0, 1);
+            }
+        }
+        const savedPalette = localStorage.getItem(STORAGE_KEYS.palette);
+        if (savedPalette) {
+            try {
+                const parsed = JSON.parse(savedPalette);
+                if (Array.isArray(parsed)) {
+                    state.currentPalette = parsed.map(item => ({
+                        hex: ColorUtils.normalizeHex(item.hex || item) || '#000000',
+                        a: ColorUtils.clamp(item.a || 1, 0, 1)
+                    }));
+                }
+            } catch (e) {
+                console.warn('Failed to parse palette', e);
+            }
+        }
+        const savedSavedPalettes = localStorage.getItem(STORAGE_KEYS.savedPalettes);
+        if (savedSavedPalettes) {
+            try {
+                const parsed = JSON.parse(savedSavedPalettes);
+                if (Array.isArray(parsed)) {
+                    state.savedPalettes = parsed.map(p => ({
+                        name: p.name || 'Palette',
+                        createdAt: p.createdAt || Date.now(),
+                        colors: (p.colors || []).map(item => ({
+                            hex: ColorUtils.normalizeHex(item.hex || item) || '#000000',
+                            a: ColorUtils.clamp(item.a || 1, 0, 1)
+                        }))
+                    }));
+                }
+            } catch (e) {
+                console.warn('Failed to parse saved palettes', e);
+            }
+        }
+        const savedRecents = localStorage.getItem(STORAGE_KEYS.recent);
+        if (savedRecents) {
+            try {
+                const parsed = JSON.parse(savedRecents);
+                if (Array.isArray(parsed)) {
+                    state.recentColors = parsed.map(item => {
+                        if (typeof item === 'string') {
+                            return { hex: ColorUtils.normalizeHex(item), a: 1 };
+                        }
+                        return { hex: ColorUtils.normalizeHex(item.hex), a: ColorUtils.clamp(item.a || 1, 0, 1) };
+                    }).filter(c => c.hex);
+                }
+            } catch (e) {
+                console.warn('Failed to parse recents', e);
+            }
+        }
+        const savedTab = localStorage.getItem(STORAGE_KEYS.tab);
+        if (savedTab === 'advanced') {
+            state.lastColorTab = 'advanced';
+        }
+        const savedGradient = localStorage.getItem(STORAGE_KEYS.gradient);
+        if (savedGradient) {
+            try {
+                const parsed = JSON.parse(savedGradient);
+                if (Array.isArray(parsed)) {
+                    state.gradientStops = parsed.map(stop => ({
+                        position: ColorUtils.clamp(parseFloat(stop.position) || 0, 0, 1),
+                        hex: ColorUtils.normalizeHex(stop.hex) || '#ffffff',
+                        a: ColorUtils.clamp(stop.a || 1, 0, 1)
+                    }));
+                }
+            } catch (e) {
+                console.warn('Failed to parse gradient stops', e);
+            }
+        }
+        const savedGradientMode = localStorage.getItem(STORAGE_KEYS.gradientMode);
+        if (savedGradientMode) {
+            state.gradientInterpolation = savedGradientMode;
+        }
+        if (gradientInterpSelect) {
+            gradientInterpSelect.value = state.gradientInterpolation;
+        }
+        ensureDefaultGradientStops();
         
         // Load menu collapsed state
         const savedMenuCollapsed = localStorage.getItem('lifepad-menu-collapsed');
@@ -1694,6 +2808,7 @@
             state.menuCollapsed = true;
             document.getElementById('app').classList.add('menu-collapsed');
         }
+        updateCurrentColor();
         
         // Load canvas
         loadCanvasFromStorage();
@@ -1701,7 +2816,7 @@
 
     // Walkthrough modal functions
     let currentWalkthroughSlide = 0;
-    let totalWalkthroughSlides = 6;
+    let totalWalkthroughSlides = 4;
     
     function checkWalkthroughPreference() {
         const dontShow = localStorage.getItem('lifepad-no-walkthrough');
@@ -1723,11 +2838,16 @@
     }
     
     function goToWalkthroughSlide(index) {
-        currentWalkthroughSlide = index;
+        if (!walkthroughSlides || walkthroughSlides.length === 0) {
+            return;
+        }
+
+        const maxIndex = walkthroughSlides.length - 1;
+        currentWalkthroughSlide = Math.min(Math.max(index, 0), maxIndex);
         
         // Update slides
         walkthroughSlides.forEach((slide, i) => {
-            if (i === index) {
+            if (i === currentWalkthroughSlide) {
                 slide.classList.add('active');
             } else {
                 slide.classList.remove('active');
@@ -1736,7 +2856,7 @@
         
         // Update dots
         walkthroughDots.forEach((dot, i) => {
-            if (i === index) {
+            if (i === currentWalkthroughSlide) {
                 dot.classList.add('active');
             } else {
                 dot.classList.remove('active');
@@ -1745,13 +2865,19 @@
 
         if (walkthroughContent) {
             walkthroughContent.scrollTop = 0;
+            const slideBg = walkthroughSlides[currentWalkthroughSlide].style.getPropertyValue('--walkthrough-bg');
+            if (slideBg) {
+                walkthroughContent.style.setProperty('--active-walkthrough-bg', slideBg);
+            } else {
+                walkthroughContent.style.removeProperty('--active-walkthrough-bg');
+            }
         }
 
         
         // Update buttons
-        walkthroughPrevBtn.disabled = (index === 0);
+        walkthroughPrevBtn.disabled = (currentWalkthroughSlide === 0);
         
-        if (index === totalWalkthroughSlides - 1) {
+        if (currentWalkthroughSlide === totalWalkthroughSlides - 1) {
             walkthroughNextBtn.textContent = 'Start Drawing';
         } else {
             walkthroughNextBtn.textContent = 'Next';
@@ -1759,9 +2885,11 @@
     }
     
     function nextWalkthroughSlide() {
-        if (currentWalkthroughSlide < totalWalkthroughSlides - 1) {
-            goToWalkthroughSlide(currentWalkthroughSlide + 1);
+        const nextIndex = currentWalkthroughSlide + 1;
+        if (nextIndex < totalWalkthroughSlides) {
+            goToWalkthroughSlide(nextIndex);
         } else {
+            goToWalkthroughSlide(totalWalkthroughSlides - 1);
             closeWalkthrough();
         }
     }
