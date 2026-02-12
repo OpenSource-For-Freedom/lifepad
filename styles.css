@@ -727,6 +727,95 @@ html, body {
     .advanced-panel {
         width: 100%;
     }
+
+    /* Mobile-friendly Advanced tab improvements */
+    .inspector-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .inspector-grid label {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .inspector-grid input {
+        width: 100%;
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .section-header h4 {
+        font-size: 16px;
+    }
+
+    .inspector-actions,
+    .palette-actions {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .inspector-actions .mini-btn,
+    .palette-actions .mini-btn {
+        flex: 1;
+        padding: 10px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .mini-btn {
+        padding: 10px 12px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .harmony-section select,
+    .gradient-builder select,
+    .image-extract select {
+        padding: 10px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .palette-save-row input,
+    .palette-load-row select {
+        padding: 10px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .gradient-actions {
+        flex-direction: column;
+    }
+
+    .gradient-actions .mini-btn,
+    .gradient-actions .secondary-btn {
+        width: 100%;
+        padding: 12px;
+        font-size: 14px;
+    }
+
+    .image-extract .extract-controls {
+        flex-wrap: wrap;
+    }
+
+    .image-extract .extract-controls label,
+    .image-extract .extract-controls select {
+        font-size: 14px;
+    }
+
+    .palette-io-row {
+        flex-direction: column;
+    }
+
+    .palette-io-row .mini-btn {
+        width: 100%;
+    }
 }
 
 .primary-btn, .secondary-btn {
