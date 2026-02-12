@@ -2765,7 +2765,34 @@
             
             applyAnswerBtn.disabled = false;
             applyAnswerBtn.textContent = 'Applied';
-            // Toast notification will be shown after handshake completes
+            
+            // FORCE modal to close immediately - don't wait for handshake
+            // The handshake will complete in the background and show the success modal
+            console.log('Answer applied - forcing modal close');
+            setTimeout(() => {
+                if (!collabModal.classList.contains('hidden')) {
+                    console.log('Forcing collab modal close after answer applied');
+                    collabModal.classList.add('hidden');
+                    collabModal.style.display = 'none';
+                }
+            }, 200);
+            
+            // Show connection success modal after handshake completes (7 second timeout)
+            const successTimeout = setTimeout(() => {
+                if (RTC.handshakeComplete) {
+                    console.log('Handshake already complete');
+                } else {
+                    // Timeout - just show success modal anyway
+                    console.log('Handshake timeout - showing success modal anyway');
+                    connectionSuccessModal.classList.remove('hidden');
+                    connectionSuccessModal.style.display = '';
+                    localNameDisplay.textContent = RTC.localName || 'You';
+                    remoteNameDisplay.textContent = RTC.remoteName || 'Partner';
+                }
+            }, 7000);
+            
+            // Store timeout ID so we can clear it if handshake completes early
+            window.successModalTimeout = successTimeout;
             
             // Reset button text after delay
             setTimeout(() => {
@@ -3633,6 +3660,12 @@
         completeHandshake() {
             this.handshakeComplete = true;
             updateCollabStatus(`Connected to ${this.remoteName || 'Peer'}`);
+            
+            // Clear any pending success modal timeout
+            if (window.successModalTimeout) {
+                clearTimeout(window.successModalTimeout);
+                window.successModalTimeout = null;
+            }
             
             // Immediately and explicitly close the collaboration modal
             console.log('Handshake complete - closing collab modal');

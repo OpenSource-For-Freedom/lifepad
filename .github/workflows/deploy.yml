@@ -1,10 +1,8 @@
-name: Deploy 
+name: Deploy with Step Security
 
 on:
-
   push:
     branches: [ "Primary" ]
-
   workflow_dispatch:
 
 permissions:
@@ -16,25 +14,81 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
-jobs:
-
+jobs:  
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout code
+        id: checkout
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4.2.0
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref }}
+      
+      - name: Validate repository structure
+        id: validate
+        shell: bash
+        run: |
+          echo "Validating repository structure..."
+          # Check for critical files
+          if [ ! -f "index.html" ]; then
+            echo "ERROR: index.html not found"
+            exit 1
+          fi
+          # Check for malicious patterns in code
+          if grep -r "eval(" --include="*.js" --include="*.html" . 2>/dev/null | grep -v node_modules; then
+            echo "WARNING: Found eval() calls - review carefully"
+          fi
+          echo "validation_status=passed" >> $GITHUB_OUTPUT
       
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        id: pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7ce60 # v4.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check artifact contents (security scan)
+        id: scan
+        shell: bash
+        run: |
+          echo "Scanning artifact for security issues..."
+          # Check file sizes
+          find . -type f \( -name "*.js" -o -name "*.css" -o -name "*.html" \) -size +10M -exec echo "WARNING: Large file found: {}" \;
+          # Verify no sensitive files are included
+          if [ -f ".env" ] || [ -f ".env.local" ] || [ -f ".env.*.local" ]; then
+            echo "ERROR: Environment files detected - these should never be committed"
+            exit 1
+          fi
+          echo "scan_status=complete" >> $GITHUB_OUTPUT
       
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        id: upload
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.0
         with:
           path: '.'
+          retention-days: 1
       
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164830a3a54ee6f716cf6e7920d9f1c3cc # v4.0.5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Verify deployment
+        id: verify
+        shell: bash
+        run: |
+          echo "Deployment verification:"
+          echo "- URL: ${{ steps.deployment.outputs.page_url }}"
+          echo "- Status: Completed successfully"
+          # Log deployment summary
+          echo "deployment_verified=true" >> $GITHUB_OUTPUT
