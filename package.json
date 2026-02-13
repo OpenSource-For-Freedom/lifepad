@@ -8,7 +8,7 @@
     "start": "npx http-server -p 3000 -c-1"
   },
   "devDependencies": {
-    "kill-port": "^1.6.1"
+    "kill-port": "^2.0.1"
   },
   "keywords": ["pwa", "productivity"],
   "author": "",
