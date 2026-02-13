@@ -77,7 +77,6 @@
         palette: 'lifepad-current-palette',
         savedPalettes: 'lifepad-saved-palettes',
         recent: 'lifepad-recent-colors',
-        tab: 'lifepad-color-tab',
         gradient: 'lifepad-gradient-stops',
         gradientMode: 'lifepad-gradient-mode'
     };
@@ -264,8 +263,8 @@
     let menuToggleBtn;
     // Color lab elements
     let advancedColorToggle, advancedColorPanel, advancedColorBackdrop, closeAdvancedPanelBtn;
-    let tabBasicBtn, tabAdvancedBtn;
     let colorWheelCanvas, colorWheelCtx, colorWheelIndicator, lightnessSlider, lightnessValue, gradientSwatches, advancedColorChip;
+    let inlinePaletteGroup, inlinePaletteSwatches;
     let inspectorHexInput, inspectorRInput, inspectorGInput, inspectorBInput, inspectorHInput, inspectorSInput, inspectorLInput, inspectorAlphaInput;
     let copyHexBtn, copyRgbBtn;
     let harmonyModeSelect, harmonySwatches, harmonyAddAllBtn;
@@ -369,14 +368,14 @@
         advancedColorPanel = document.getElementById('advanced-color-panel');
         advancedColorBackdrop = document.getElementById('advanced-color-backdrop');
         closeAdvancedPanelBtn = document.getElementById('close-advanced-panel');
-        tabBasicBtn = document.getElementById('tab-basic-btn');
-        tabAdvancedBtn = document.getElementById('tab-advanced-btn');
         colorWheelCanvas = document.getElementById('color-wheel-canvas');
         colorWheelIndicator = document.getElementById('color-wheel-indicator');
         lightnessSlider = document.getElementById('lightness-slider');
         lightnessValue = document.getElementById('lightness-value');
         advancedColorChip = document.getElementById('advanced-current-chip');
         gradientSwatches = Array.from(document.querySelectorAll('.gradient-swatch'));
+        inlinePaletteGroup = document.querySelector('.palette-inline-group');
+        inlinePaletteSwatches = document.getElementById('inline-palette-swatches');
         inspectorHexInput = document.getElementById('inspector-hex');
         inspectorRInput = document.getElementById('inspector-r');
         inspectorGInput = document.getElementById('inspector-g');
@@ -455,18 +454,6 @@
         // Menu toggle element
         menuToggleBtn = document.getElementById('menu-toggle');
 
-        // Advanced color panel elements
-        advancedColorToggle = document.getElementById('advanced-color-toggle');
-        advancedColorPanel = document.getElementById('advanced-color-panel');
-        advancedColorBackdrop = document.getElementById('advanced-color-backdrop');
-        closeAdvancedPanelBtn = document.getElementById('close-advanced-panel');
-        colorWheelCanvas = document.getElementById('color-wheel-canvas');
-        colorWheelIndicator = document.getElementById('color-wheel-indicator');
-        lightnessSlider = document.getElementById('lightness-slider');
-        lightnessValue = document.getElementById('lightness-value');
-        advancedColorChip = document.getElementById('advanced-current-chip');
-        gradientSwatches = Array.from(document.querySelectorAll('.gradient-swatch'));
-
         if (colorWheelCanvas) {
             colorWheelCtx = colorWheelCanvas.getContext('2d');
         }
@@ -487,7 +474,6 @@
         renderGradient();
         renderHarmony();
         updateInspectorFields();
-        switchColorTab(state.lastColorTab);
         
         // Setup event listeners
         setupEventListeners();
@@ -703,10 +689,6 @@
             });
         }
 
-        if (tabBasicBtn && tabAdvancedBtn) {
-            tabBasicBtn.addEventListener('click', () => switchColorTab('basic'));
-            tabAdvancedBtn.addEventListener('click', () => switchColorTab('advanced'));
-        }
         if (inspectorHexInput) {
             inspectorHexInput.addEventListener('change', applyInspectorHex);
             inspectorHexInput.addEventListener('blur', applyInspectorHex);
@@ -743,14 +725,14 @@
         }
         if (harmonyAddAllBtn) {
             harmonyAddAllBtn.addEventListener('click', () => {
-                const baseHex = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+                const baseHex = state.baseColor;
                 const mode = harmonyModeSelect ? harmonyModeSelect.value : 'complementary';
                 const colors = generateHarmonyColors(mode, baseHex);
                 colors.forEach(c => addColorToPalette(c, state.alpha));
             });
         }
         if (paletteAddCurrentBtn) {
-            paletteAddCurrentBtn.addEventListener('click', () => addColorToPalette(ColorUtils.shiftHue(state.baseColor, state.hueShift), state.alpha));
+            paletteAddCurrentBtn.addEventListener('click', () => addColorToPalette(state.baseColor, state.alpha));
         }
         if (paletteClearBtn) {
             paletteClearBtn.addEventListener('click', clearCurrentPalette);
@@ -798,12 +780,14 @@
         // Color selection
         colorSwatches.forEach(swatch => {
             swatch.addEventListener('click', function() {
+                setHueShift(0);
                 selectColor(this.dataset.color);
                 updateActiveColorSwatch(this);
             });
         });
 
         const handleCustomColorChange = function() {
+            setHueShift(0);
             selectColor(this.value);
             updateActiveColorSwatch(null);
         };
@@ -817,16 +801,12 @@
             penSizeValue.textContent = this.value;
         });
 
-        // Hue shift
-        hueShiftSlider.addEventListener('input', function() {
-            state.hueShift = parseInt(this.value);
-            hueShiftValue.textContent = this.value + '°';
-            updateCurrentColor();
-            updateColorSwatchesDisplay();
-            updateInspectorFields();
-            renderHarmony();
-            localStorage.setItem('lifepad-hue-shift', state.hueShift);
-        });
+        // Hue shift (disabled: Color Lab is source of truth)
+        if (hueShiftSlider) {
+            hueShiftSlider.addEventListener('input', function() {
+                setHueShift(0);
+            });
+        }
 
         // Brush texture
         brushTextureSelect.addEventListener('change', function() {
@@ -976,6 +956,7 @@
         updateInspectorFields();
         renderHarmony();
         renderGradient();
+        updateInlinePaletteActive(normalized, state.alpha);
     }
 
     function selectColor(color, alpha) {
@@ -986,17 +967,29 @@
     }
 
     function updateCurrentColor() {
-        // Apply hue shift to base color
         const shifted = ColorUtils.shiftHue(state.baseColor, state.hueShift);
         state.currentColor = ColorUtils.toRgbaString(shifted, state.alpha);
     }
 
+    function setHueShift(value) {
+        state.hueShift = 0;
+        if (hueShiftSlider) hueShiftSlider.value = 0;
+        if (hueShiftValue) hueShiftValue.textContent = '0°';
+        updateCurrentColor();
+        updateColorSwatchesDisplay();
+        updateInspectorFields();
+        renderHarmony();
+        renderCurrentPalette();
+        renderInlinePalette();
+    }
+
     function setAdvancedColorFromHSL(h, s, l) {
-        advancedColorState.h = h;
-        advancedColorState.s = s;
-        advancedColorState.l = l;
+        advancedColorState.h = Number.isFinite(h) ? h : advancedColorState.h;
+        advancedColorState.s = Number.isFinite(s) ? s : advancedColorState.s;
+        advancedColorState.l = Number.isFinite(l) ? l : advancedColorState.l;
         const rgb = ColorUtils.hslToRgb(h, s, l);
         const hex = ColorUtils.rgbToHex(rgb.r, rgb.g, rgb.b);
+        setHueShift(0);
         selectColor(hex);
         if (customColorPicker) {
             customColorPicker.value = hex;
@@ -1009,6 +1002,7 @@
 
     function drawColorWheel() {
         if (!colorWheelCtx || !colorWheelCanvas) return;
+        const lightness = Number.isFinite(advancedColorState.l) ? ColorUtils.clamp(advancedColorState.l, 0, 100) : 50;
         const { width, height } = colorWheelCanvas;
         const cx = width / 2;
         const cy = height / 2;
@@ -1028,7 +1022,7 @@
                 const sat = Math.min(dist / radius, 1) * 100;
                 let hue = Math.atan2(dy, dx) * (180 / Math.PI);
                 hue = (hue + 360) % 360;
-                const rgb = ColorUtils.hslToRgb(hue, sat, advancedColorState.l);
+                const rgb = ColorUtils.hslToRgb(hue, sat, lightness);
                 data[idx] = rgb.r;
                 data[idx + 1] = rgb.g;
                 data[idx + 2] = rgb.b;
@@ -1075,6 +1069,13 @@
         advancedColorPanel.setAttribute('aria-hidden', 'false');
         drawColorWheel();
         positionColorWheelIndicator();
+
+        // Ensure current palette scrolls into view on larger screens when opening
+        if (currentPaletteList && window.innerWidth >= 720) {
+            requestAnimationFrame(() => {
+                currentPaletteList.scrollTo({ left: currentPaletteList.scrollWidth, behavior: 'smooth' });
+            });
+        }
     }
 
     function closeAdvancedColorPanel() {
@@ -1097,9 +1098,9 @@
         const rgb = ColorUtils.hexToRgb(state.baseColor);
         if (rgb) {
             const hsl = ColorUtils.rgbToHsl(rgb.r, rgb.g, rgb.b);
-            advancedColorState.h = hsl.h;
-            advancedColorState.s = hsl.s;
-            advancedColorState.l = hsl.l;
+            advancedColorState.h = Number.isFinite(hsl.h) ? hsl.h : advancedColorState.h;
+            advancedColorState.s = Number.isFinite(hsl.s) ? hsl.s : advancedColorState.s;
+            advancedColorState.l = Number.isFinite(hsl.l) ? hsl.l : advancedColorState.l;
             if (lightnessSlider && lightnessValue) {
                 lightnessSlider.value = Math.round(hsl.l);
                 lightnessValue.textContent = Math.round(hsl.l) + '%';
@@ -1159,7 +1160,10 @@
             btn.className = 'swatch swatch-button';
             btn.style.background = ColorUtils.toRgbaString(item.hex, item.a);
             btn.title = `${item.hex} (${Math.round((item.a || 1) * 100)}%)`;
-            btn.addEventListener('click', () => selectColor(item.hex, item.a));
+            btn.addEventListener('click', () => {
+                setHueShift(0);
+                selectColor(item.hex, item.a);
+            });
             recentColorsRow.appendChild(btn);
         });
     }
@@ -1184,6 +1188,7 @@
         const val = inspectorHexInput.value.trim();
         const norm = ColorUtils.normalizeHex(val);
         if (norm) {
+            setHueShift(0);
             setActiveColor(norm, state.alpha);
             persist(STORAGE_KEYS.alpha, state.alpha);
         }
@@ -1198,6 +1203,7 @@
         const clampedG = ColorUtils.clamp(g, 0, 255);
         const clampedB = ColorUtils.clamp(b, 0, 255);
         const hex = ColorUtils.rgbToHex(clampedR, clampedG, clampedB);
+        setHueShift(0);
         setActiveColor(hex, state.alpha);
         persist(STORAGE_KEYS.alpha, state.alpha);
     }
@@ -1209,6 +1215,7 @@
         if ([h, s, l].some(v => isNaN(v))) return;
         const rgb = ColorUtils.hslToRgb(ColorUtils.clamp(h, 0, 360), ColorUtils.clamp(s, 0, 100), ColorUtils.clamp(l, 0, 100));
         const hex = ColorUtils.rgbToHex(rgb.r, rgb.g, rgb.b);
+        setHueShift(0);
         setActiveColor(hex, state.alpha);
         persist(STORAGE_KEYS.alpha, state.alpha);
     }
@@ -1229,31 +1236,6 @@
         }).catch(() => {
             showToast('Copy failed');
         });
-    }
-
-    function switchColorTab(tab) {
-        if (!advancedColorPanel) return;
-        const basicPanel = document.getElementById('advanced-tab-basic');
-        const advPanel = document.getElementById('advanced-tab-advanced');
-        if (!basicPanel || !advPanel) return;
-        if (tab === 'advanced') {
-            basicPanel.classList.remove('active');
-            advPanel.classList.add('active');
-            if (tabBasicBtn && tabAdvancedBtn) {
-                tabBasicBtn.classList.remove('active');
-                tabAdvancedBtn.classList.add('active');
-            }
-            state.lastColorTab = 'advanced';
-        } else {
-            basicPanel.classList.add('active');
-            advPanel.classList.remove('active');
-            if (tabBasicBtn && tabAdvancedBtn) {
-                tabBasicBtn.classList.add('active');
-                tabAdvancedBtn.classList.remove('active');
-            }
-            state.lastColorTab = 'basic';
-        }
-        persist(STORAGE_KEYS.tab, state.lastColorTab);
     }
 
     function generateHarmonyColors(mode, baseHex) {
@@ -1298,7 +1280,7 @@
 
     function renderHarmony() {
         if (!harmonySwatches) return;
-        const baseHex = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        const baseHex = state.baseColor;
         const mode = harmonyModeSelect ? harmonyModeSelect.value : 'complementary';
         const colors = generateHarmonyColors(mode, baseHex);
         harmonySwatches.innerHTML = '';
@@ -1307,7 +1289,10 @@
             btn.className = 'swatch swatch-button';
             btn.style.background = ColorUtils.toRgbaString(c, 1);
             btn.title = c;
-            btn.addEventListener('click', () => selectColor(c, state.alpha));
+            btn.addEventListener('click', () => {
+                setHueShift(0);
+                selectColor(c, state.alpha);
+            });
             harmonySwatches.appendChild(btn);
         });
     }
@@ -1315,7 +1300,8 @@
     function addColorToPalette(hex, alpha = 1) {
         const norm = ColorUtils.normalizeHex(hex);
         if (!norm) return;
-        state.currentPalette.push({ hex: norm, a: ColorUtils.clamp(alpha, 0, 1) });
+        const stored = ColorUtils.normalizeHex(ColorUtils.shiftHue(norm, state.hueShift)) || norm;
+        state.currentPalette.push({ hex: stored, a: ColorUtils.clamp(alpha, 0, 1) });
         persist(STORAGE_KEYS.palette, state.currentPalette);
         renderCurrentPalette();
     }
@@ -1351,29 +1337,77 @@
             swatch.className = 'swatch-button';
             swatch.style.background = ColorUtils.toRgbaString(item.hex, item.a);
             swatch.title = `${item.hex}`;
-            swatch.addEventListener('click', () => selectColor(item.hex, item.a));
+            swatch.addEventListener('click', () => {
+                setHueShift(0);
+                selectColor(item.hex, item.a);
+            });
 
             const controls = document.createElement('div');
             controls.className = 'palette-swatch-controls';
-            const up = document.createElement('button');
-            up.className = 'mini-btn';
-            up.textContent = '↑';
-            up.title = 'Move up';
-            up.addEventListener('click', () => movePaletteIndex(index, -1));
-            const down = document.createElement('button');
-            down.className = 'mini-btn';
-            down.textContent = '↓';
-            down.title = 'Move down';
-            down.addEventListener('click', () => movePaletteIndex(index, 1));
+            const left = document.createElement('button');
+            left.className = 'mini-btn';
+            left.textContent = '←';
+            left.title = 'Move left';
+            left.addEventListener('click', () => movePaletteIndex(index, -1));
+            const right = document.createElement('button');
+            right.className = 'mini-btn';
+            right.textContent = '→';
+            right.title = 'Move right';
+            right.addEventListener('click', () => movePaletteIndex(index, 1));
             const remove = document.createElement('button');
             remove.className = 'mini-btn';
             remove.textContent = '✕';
             remove.title = 'Remove swatch';
             remove.addEventListener('click', () => removePaletteIndex(index));
 
-            controls.append(up, down, remove);
+            controls.append(left, right, remove);
             row.append(swatch, controls);
             currentPaletteList.appendChild(row);
+        });
+
+        // Keep the newest swatches visible on desktop by nudging scroll to the right
+        requestAnimationFrame(() => {
+            currentPaletteList.scrollTo({ left: currentPaletteList.scrollWidth, behavior: 'smooth' });
+        });
+
+        renderInlinePalette();
+    }
+
+    function renderInlinePalette() {
+        if (!inlinePaletteSwatches) return;
+        inlinePaletteSwatches.innerHTML = '';
+        const maxInline = 14;
+        const list = state.currentPalette.slice(0, maxInline);
+        list.forEach(item => {
+            const btn = document.createElement('button');
+            btn.className = 'palette-inline-swatch';
+            btn.style.background = ColorUtils.toRgbaString(item.hex, item.a);
+            btn.title = item.hex;
+            btn.dataset.hex = item.hex;
+            btn.dataset.alpha = item.a;
+            btn.addEventListener('click', () => {
+                setHueShift(0);
+                selectColor(item.hex, item.a);
+            });
+            inlinePaletteSwatches.appendChild(btn);
+        });
+
+        if (inlinePaletteGroup) {
+            inlinePaletteGroup.classList.toggle('hidden-inline', list.length === 0);
+        }
+
+        updateInlinePaletteActive(state.baseColor, state.alpha);
+    }
+
+    function updateInlinePaletteActive(hex, alpha = 1) {
+        if (!inlinePaletteSwatches) return;
+        const norm = ColorUtils.normalizeHex(hex);
+        const tol = 0.01;
+        Array.from(inlinePaletteSwatches.children).forEach(btn => {
+            const btnHex = btn.dataset.hex;
+            const btnAlpha = parseFloat(btn.dataset.alpha || '1');
+            const match = btnHex === norm && Math.abs(btnAlpha - alpha) < tol;
+            btn.classList.toggle('active', match);
         });
     }
 
@@ -1455,7 +1489,7 @@
         reader.readAsText(file);
     }
 
-    function renderGradient() {
+    function renderGradient(skipStops = false) {
         if (!gradientPreview) return;
         const ctxGrad = gradientPreview.getContext('2d');
         if (!gradientPreview.width || !gradientPreview.height) {
@@ -1490,7 +1524,7 @@
             ctxGrad.fillStyle = grad;
             ctxGrad.fillRect(0, 0, w, h);
         }
-        renderGradientStops();
+        if (!skipStops) renderGradientStops();
     }
 
     function sampleGradientAt(t, stops, useHsl) {
@@ -1545,6 +1579,7 @@
             chip.title = `${stop.hex}`;
             chip.addEventListener('click', () => {
                 state.selectedGradientStop = index;
+                setHueShift(0);
                 selectColor(stop.hex, stop.a);
                 renderGradientStops();
             });
@@ -1556,8 +1591,9 @@
             slider.addEventListener('input', () => {
                 stop.position = ColorUtils.clamp(slider.value / 100, 0, 1);
                 persist(STORAGE_KEYS.gradient, state.gradientStops);
-                renderGradient();
+                renderGradient(true);
             });
+            slider.addEventListener('change', () => renderGradient());
             row.append(chip, slider);
             gradientStopsContainer.appendChild(row);
         });
@@ -1667,7 +1703,10 @@
             btn.className = 'swatch swatch-button';
             btn.style.background = c;
             btn.title = c;
-            btn.addEventListener('click', () => selectColor(c, state.alpha));
+            btn.addEventListener('click', () => {
+                setHueShift(0);
+                selectColor(c, state.alpha);
+            });
             extractSwatches.appendChild(btn);
         });
         const addBtn = document.createElement('button');
@@ -2672,12 +2711,6 @@
         else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
             e.preventDefault();
             resetZoom();
-        } else if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === '1') {
-            e.preventDefault();
-            switchColorTab('basic');
-        } else if (e.altKey && !e.ctrlKey && !e.metaKey && e.key === '2') {
-            e.preventDefault();
-            switchColorTab('advanced');
         } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
             if (inspectorHexInput) {
                 e.preventDefault();
@@ -2704,21 +2737,6 @@
             canvasContainer.classList.add('paper-mode');
         }
         
-        // Load hue shift
-        const savedHueShift = localStorage.getItem('lifepad-hue-shift');
-        if (savedHueShift !== null) {
-            const parsedHueShift = parseInt(savedHueShift);
-            if (!isNaN(parsedHueShift) && parsedHueShift >= -180 && parsedHueShift <= 180) {
-                state.hueShift = parsedHueShift;
-                if (hueShiftSlider) {
-                    hueShiftSlider.value = state.hueShift;
-                    hueShiftValue.textContent = state.hueShift + '°';
-                }
-                updateCurrentColor();
-                updateColorSwatchesDisplay();
-            }
-        }
-
         const savedAlpha = localStorage.getItem(STORAGE_KEYS.alpha);
         if (savedAlpha !== null) {
             const parsedAlpha = parseFloat(savedAlpha);
@@ -2773,10 +2791,6 @@
             } catch (e) {
                 console.warn('Failed to parse recents', e);
             }
-        }
-        const savedTab = localStorage.getItem(STORAGE_KEYS.tab);
-        if (savedTab === 'advanced') {
-            state.lastColorTab = 'advanced';
         }
         const savedGradient = localStorage.getItem(STORAGE_KEYS.gradient);
         if (savedGradient) {

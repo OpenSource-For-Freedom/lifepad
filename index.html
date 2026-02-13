@@ -99,8 +99,8 @@
         <!-- Top Navbar -->
         <nav class="navbar">
             <div class="nav-section colors-section">
-                <label>Colors:</label>
-                <div class="color-swatches">
+                <label>Palette:</label>
+                <div class="color-swatches preset-swatches">
                     <button class="color-swatch active" data-color="#000000" style="background: #000000;" title="Black"></button>
                     <button class="color-swatch" data-color="#ff4444" style="background: #ff4444;" title="Red"></button>
                     <button class="color-swatch" data-color="#4488ff" style="background: #4488ff;" title="Blue"></button>
@@ -111,18 +111,15 @@
                     <button class="color-swatch" data-color="#ffffff" style="background: #ffffff; border: 1px solid #ccc;" title="White"></button>
                     <input type="color" id="custom-color" value="#000000" title="Custom color">
                 </div>
+                <div class="palette-inline-group hidden-inline" aria-label="Palette colors">
+                    <div id="inline-palette-swatches" class="color-swatches palette-inline"></div>
+                </div>
             </div>
 
             <div class="nav-section">
                 <label for="pen-size">Size:</label>
                 <input type="range" id="pen-size" min="1" max="48" value="4" step="1">
                 <span id="pen-size-value">4</span>
-            </div>
-
-            <div class="nav-section">
-                <label for="hue-shift">Hue:</label>
-                <input type="range" id="hue-shift" min="-180" max="180" value="0" step="1">
-                <span id="hue-shift-value">0°</span>
             </div>
 
             <div class="nav-section">
@@ -395,46 +392,39 @@
                 <p class="panel-kicker">Color Lab</p>
                 <h3>Gradient Wheel & Palettes</h3>
             </div>
-            <div class="advanced-tab-buttons">
-                <button class="tab-btn active" data-tab="basic" id="tab-basic-btn" title="Basic color tools (Alt+1)">Basic</button>
-                <button class="tab-btn" data-tab="advanced" id="tab-advanced-btn" title="Advanced color tools (Alt+2)">Advanced</button>
-                <button id="close-advanced-panel" class="close-btn" title="Close color lab">✕</button>
-            </div>
+            <button id="close-advanced-panel" class="close-btn" title="Close color lab">✕</button>
         </div>
         <div class="advanced-panel-body">
-            <div id="advanced-tab-basic" class="advanced-tab-panel active">
-                <div class="color-wheel-wrapper">
-                    <canvas id="color-wheel-canvas" width="240" height="240" aria-label="Color wheel"></canvas>
-                    <div id="color-wheel-indicator" class="color-wheel-indicator"></div>
-                </div>
-                <div class="slider-group">
-                    <label for="lightness-slider">Lightness</label>
-                    <div class="slider-row">
-                        <input type="range" id="lightness-slider" min="0" max="100" value="50" step="1">
-                        <span id="lightness-value" class="slider-value">50%</span>
-                    </div>
-                </div>
-                <div class="palette-section">
-                    <div class="palette-header">
-                        <h4>Artist Palettes</h4>
-                        <p class="palette-note">Tap to set your brush color</p>
-                    </div>
-                    <div class="gradient-swatches">
-                        <button class="gradient-swatch" data-gradient="#ff5f6d,#ffc371" aria-label="Sunset"></button>
-                        <button class="gradient-swatch" data-gradient="#6a85b6,#bac8e0" aria-label="Mist"></button>
-                        <button class="gradient-swatch" data-gradient="#00c6ff,#0072ff" aria-label="Ocean"></button>
-                        <button class="gradient-swatch" data-gradient="#ff8a00,#e52e71" aria-label="Candy"></button>
-                        <button class="gradient-swatch" data-gradient="#7f5a83,#0d324d" aria-label="Noir"></button>
-                        <button class="gradient-swatch" data-gradient="#78ffd6,#007991" aria-label="Lagoon"></button>
-                    </div>
-                </div>
-                <div class="current-color-row">
-                    <span>Current</span>
-                    <div id="advanced-current-chip" class="color-chip"></div>
+            <div class="color-wheel-wrapper">
+                <canvas id="color-wheel-canvas" width="240" height="240" aria-label="Color wheel"></canvas>
+                <div id="color-wheel-indicator" class="color-wheel-indicator"></div>
+            </div>
+            <div class="slider-group">
+                <label for="lightness-slider">Lightness</label>
+                <div class="slider-row">
+                    <input type="range" id="lightness-slider" min="0" max="100" value="50" step="1">
+                    <span id="lightness-value" class="slider-value">50%</span>
                 </div>
             </div>
+            <div class="palette-section">
+                <div class="palette-header">
+                    <h4>Artist Palettes</h4>
+                    <p class="palette-note">Tap to set your brush color</p>
+                </div>
+                <div class="gradient-swatches">
+                    <button class="gradient-swatch" data-gradient="#ff5f6d,#ffc371" aria-label="Sunset"></button>
+                    <button class="gradient-swatch" data-gradient="#6a85b6,#bac8e0" aria-label="Mist"></button>
+                    <button class="gradient-swatch" data-gradient="#00c6ff,#0072ff" aria-label="Ocean"></button>
+                    <button class="gradient-swatch" data-gradient="#ff8a00,#e52e71" aria-label="Candy"></button>
+                    <button class="gradient-swatch" data-gradient="#7f5a83,#0d324d" aria-label="Noir"></button>
+                    <button class="gradient-swatch" data-gradient="#78ffd6,#007991" aria-label="Lagoon"></button>
+                </div>
+            </div>
+            <div class="current-color-row">
+                <span>Current</span>
+                <div id="advanced-current-chip" class="color-chip"></div>
+            </div>
 
-            <div id="advanced-tab-advanced" class="advanced-tab-panel">
                 <div class="inspector-section">
                     <div class="section-header">
                         <h4>Color Inspector</h4>
