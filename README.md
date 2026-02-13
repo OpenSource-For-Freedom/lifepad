@@ -1,5 +1,5 @@
 # lifePAD
-
+1[front](assets/front.png)
 Primary Artistry Device: a simple, mobile-first sketch pad for touch and stylus.
 
 **In Memory of Shirley Parrish** — My grandmother, 1932-2026: Her guidance in painting and drawing inspired this tool and its focus on creativity.
@@ -18,6 +18,8 @@ lifePAD is a progressive web app for quick sketches, diagrams, and notes. It run
 - Workflow: undo/redo history, eraser, move/pan, optional paper background, light/dark themes
 - Export: save as PNG or SVG; installable and offline-ready
 - Privacy: no accounts, no tracking, data stays local
+
+1[back](assets/back.png)
 
 ## Quick start
 
