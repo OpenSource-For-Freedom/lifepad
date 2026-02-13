@@ -2,7 +2,7 @@ name: Deploy with Step Security
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "Primary" ]
   workflow_dispatch:
 
 permissions:
