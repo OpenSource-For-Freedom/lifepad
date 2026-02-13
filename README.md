@@ -22,7 +22,7 @@ lifePAD is a progressive web app for quick sketches, diagrams, and notes. It run
 ![back](assets/back.png)
 
 ## Quick start
-
+[![Deploy with Step Security](https://github.com/OpenSource-For-Freedom/lifepad/actions/workflows/deploy.yml/badge.svg)](https://github.com/OpenSource-For-Freedom/lifepad/actions/workflows/deploy.yml)
 1) Clone and enter the repo
 
 ```bash
