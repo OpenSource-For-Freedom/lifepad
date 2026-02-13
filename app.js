@@ -1,6 +1,5 @@
 // lifePAD - Primary Artistry Device
-// Drawing app with touch/stylus support, PWA capabilities, and offline functionality
-
+// Core design features 
 (function() {
     'use strict';
 
