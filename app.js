@@ -283,6 +283,8 @@
     let connectionSuccessModal, closeConnectionSuccess, localNameDisplay, remoteNameDisplay;
 
     let isColorWheelDragging = false;
+    const supportsPointerEvents = 'PointerEvent' in window;
+    let pointerEventSeen = false; // Used to ignore duplicate touch events when pointer events fire
 
     // Initialize app
     function init() {
@@ -920,12 +922,23 @@
             }
         });
 
-        // Drawing events - using Pointer Events for universal support
-        drawCanvas.addEventListener('pointerdown', startDrawing);
-        drawCanvas.addEventListener('pointermove', draw);
-        drawCanvas.addEventListener('pointerup', stopDrawing);
-        drawCanvas.addEventListener('pointercancel', stopDrawing);
-        drawCanvas.addEventListener('pointerleave', stopDrawing);
+        // Drawing events – attach pointer; also attach touch/mouse as safety net
+        if (supportsPointerEvents) {
+            drawCanvas.addEventListener('pointerdown', (e) => { pointerEventSeen = true; startDrawing(e); });
+            drawCanvas.addEventListener('pointermove', draw);
+            drawCanvas.addEventListener('pointerup', stopDrawing);
+            drawCanvas.addEventListener('pointercancel', stopDrawing);
+            drawCanvas.addEventListener('pointerleave', stopDrawing);
+        }
+
+        // Always add touch/mouse fallback: ignored if pointer events already active
+        drawCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        drawCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        drawCanvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        drawCanvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+        drawCanvas.addEventListener('mousedown', handleMouseDown);
+        drawCanvas.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
 
         // Prevent context menu on long press
         drawCanvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -943,6 +956,7 @@
         if (!normalized) return;
         state.baseColor = normalized;
         state.alpha = ColorUtils.clamp(alpha, 0, 1);
+        enforceVisibleAlpha();
         persist(STORAGE_KEYS.alpha, state.alpha);
         updateCurrentColor();
         if (customColorPicker) {
@@ -1224,6 +1238,7 @@
         const a = parseFloat(inspectorAlphaInput.value);
         if (isNaN(a)) return;
         state.alpha = ColorUtils.clamp(a, 0, 1);
+        enforceVisibleAlpha('input');
         persist(STORAGE_KEYS.alpha, state.alpha);
         updateCurrentColor();
         updateSelectedGradientStopColor(state.baseColor, state.alpha);
@@ -1955,6 +1970,8 @@
     const PRESSURE_MIN = 0.1;      // Minimum pressure to avoid zero-width strokes
     const PRESSURE_MAX = 1.5;      // Maximum pressure to avoid excessive width
     const PRESSURE_SCALE = 2;      // Scale factor for stylus pressure sensitivity
+    const MOUSE_POINTER_ID = 1;
+    const MIN_DRAW_ALPHA = 0.01;   // Keep opacity above 0 to avoid invisible strokes
 
     // Normalize pressure value for all pointer types
     function normalizePressure(e) {
@@ -1986,8 +2003,81 @@
         return e.pressure;
     }
 
+    function enforceVisibleAlpha(context) {
+        if (state.alpha >= MIN_DRAW_ALPHA) return false;
+        state.alpha = 1;
+        if (inspectorAlphaInput) {
+            inspectorAlphaInput.value = state.alpha.toFixed(2);
+        }
+        if (context === 'load' || context === 'input') {
+            showToast('Brush opacity was 0%; reset to 100% for visibility');
+        }
+        return true;
+    }
+
+    // Touch/mouse fallbacks for browsers without Pointer Events (some Samsung builds)
+    function touchToPointerEvent(touchEvent) {
+        const touch = touchEvent.changedTouches && touchEvent.changedTouches[0];
+        if (!touch) return null;
+        return {
+            pointerId: touch.identifier ?? 0,
+            pointerType: 'touch',
+            clientX: touch.clientX,
+            clientY: touch.clientY,
+            pressure: touch.force || 1,
+            preventDefault: () => touchEvent.preventDefault()
+        };
+    }
+
+    function mouseToPointerEvent(mouseEvent) {
+        return {
+            pointerId: MOUSE_POINTER_ID,
+            pointerType: 'mouse',
+            clientX: mouseEvent.clientX,
+            clientY: mouseEvent.clientY,
+            pressure: 1,
+            preventDefault: () => mouseEvent.preventDefault()
+        };
+    }
+
+    function handleTouchStart(e) {
+        if (supportsPointerEvents && pointerEventSeen) return; // Pointer events already working
+        const pe = touchToPointerEvent(e);
+        if (!pe) return;
+        startDrawing(pe, { skipPointerCapture: true });
+    }
+
+    function handleTouchMove(e) {
+        if (supportsPointerEvents && pointerEventSeen) return;
+        const pe = touchToPointerEvent(e);
+        if (!pe) return;
+        draw(pe);
+    }
+
+    function handleTouchEnd(e) {
+        if (supportsPointerEvents && pointerEventSeen) return;
+        const pe = touchToPointerEvent(e);
+        if (!pe) return;
+        stopDrawing(pe);
+    }
+
+    function handleMouseDown(e) {
+        startDrawing(mouseToPointerEvent(e), { skipPointerCapture: true });
+    }
+
+    function handleMouseMove(e) {
+        if (state.currentPointerId !== MOUSE_POINTER_ID) return;
+        draw(mouseToPointerEvent(e));
+    }
+
+    function handleMouseUp(e) {
+        if (state.currentPointerId !== MOUSE_POINTER_ID) return;
+        stopDrawing(mouseToPointerEvent(e));
+    }
+
     // Drawing functions
-    function startDrawing(e) {
+    function startDrawing(e, options = {}) {
+        const skipPointerCapture = Boolean(options.skipPointerCapture);
         e.preventDefault();
         
         // Only handle one pointer at a time
@@ -1997,11 +2087,13 @@
         }
         
         state.currentPointerId = e.pointerId;
-        try {
-            drawCanvas.setPointerCapture(e.pointerId);
-        } catch (err) {
-            // Pointer capture may fail in some cases, that's okay
-            console.log('setPointerCapture failed:', err.message);
+        if (!skipPointerCapture) {
+            try {
+                drawCanvas.setPointerCapture(e.pointerId);
+            } catch (err) {
+                // Pointer capture may fail in some cases, that's okay
+                console.log('setPointerCapture failed:', err.message);
+            }
         }
         
         const rect = drawCanvas.getBoundingClientRect();
@@ -2743,6 +2835,9 @@
             if (!isNaN(parsedAlpha)) {
                 state.alpha = ColorUtils.clamp(parsedAlpha, 0, 1);
             }
+        }
+        if (enforceVisibleAlpha('load')) {
+            persist(STORAGE_KEYS.alpha, state.alpha);
         }
         const savedPalette = localStorage.getItem(STORAGE_KEYS.palette);
         if (savedPalette) {
