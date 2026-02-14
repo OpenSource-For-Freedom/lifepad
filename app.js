@@ -2256,8 +2256,9 @@
         if (state.isDrawing && state.currentPointerId === null) {
             state.currentPointerId = e.pointerId;
         }
-        // On certain touch implementations, the id can flip; allow touch to rebind while drawing
-        if (state.isDrawing && e.pointerType === 'touch' && state.currentPointerId !== e.pointerId) {
+        // BUG: Jared found missing stroke pattern on outer edges iOS ipad pro
+        // On some stacks the pointer id can change mid-stroke (touch or pen); let it rebind while drawing
+        if (state.isDrawing && e.pointerType !== 'mouse' && state.currentPointerId !== e.pointerId) {
             state.currentPointerId = e.pointerId;
         }
         // Only handle the tracked pointer
