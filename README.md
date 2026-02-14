@@ -44,7 +44,6 @@ npm run dev
 
 Open the live site, then use your browser’s install/add-to-home-screen or install option:
 
-- Android/Chrome: open the site, tap the three-dot menu, choose Add to Home screen or Install app.
 - iOS/Safari: open the site, tap Share, then Add to Home Screen.
 - Desktop Chrome/Edge: open the site, click the install icon in the address bar (or use the app’s Install button) and confirm.
 
