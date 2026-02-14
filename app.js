@@ -10,7 +10,11 @@
         hueShift: 0, // Hue shift in degrees (-180 to 180)
         currentSize: 4,
         currentTexture: 'ink',
+        currentBrushPreset: 'pen-hard-round',
+        lastBrushPreset: 'pen-hard-round',
+        currentBrushConfig: null,
         isEraser: false,
+        currentBrushLabel: 'Pen (hard round)',
         alpha: 1,
         isDrawing: false,
         lastX: 0,
@@ -96,6 +100,275 @@
     // Text estimation constants
     const TEXT_CHAR_WIDTH = 14; // Approximate character width at 24px font
     const TEXT_LINE_HEIGHT = 28; // Approximate line height at 24px font
+
+    // Brushes & tools catalog for unified dropdown
+    const DEFAULT_BRUSH_PRESET = 'pen-hard-round';
+    const DEFAULT_ERASER_PRESET = 'eraser-soft';
+    const BRUSH_PRESETS = {
+        // Core drawing
+        'pencil-hb': { engine: 'pencil', sizeScale: 0.8, opacity: 0.45, spacing: 0.15, grain: 0.9, jitter: 0.6 },
+        'mechanical-pencil': { engine: 'pencil', sizeScale: 0.5, opacity: 0.35, spacing: 0.1, grain: 0.35, jitter: 0.2 },
+        'pen-hard-round': { engine: 'ink', sizeScale: 0.9, opacity: 1.0, spacing: 0.04 },
+        'technical-pen': { engine: 'ink', sizeScale: 0.75, opacity: 1.0, spacing: 0.02 },
+        'fineliner': { engine: 'ink', sizeScale: 0.6, opacity: 0.95, spacing: 0.015 },
+        'brush-pen': { engine: 'ink', sizeScale: 1.05, opacity: 0.9, spacing: 0.06, taper: true },
+        'calligraphy-pen': { engine: 'ink', sizeScale: 1.2, opacity: 0.9, spacing: 0.05, angle: 18 },
+        'marker-felt': { engine: 'marker', sizeScale: 1.05, opacity: 0.68, spacing: 0.08, streaks: 0.35 },
+        'marker-chisel': { engine: 'marker', sizeScale: 1.25, opacity: 0.75, spacing: 0.07, angle: 12, streaks: 0.6 },
+        // Painting
+        'round-paint-soft': { engine: 'ink', sizeScale: 1.5, opacity: 0.8, spacing: 0.05, softEdge: true },
+        'flat-brush': { engine: 'ink', sizeScale: 1.6, opacity: 0.85, spacing: 0.04, angle: 10, softEdge: true },
+        'filbert': { engine: 'ink', sizeScale: 1.3, opacity: 0.82, spacing: 0.05, softEdge: true },
+        'fan-brush': { engine: 'spray', sizeScale: 1.8, opacity: 0.28, spacing: 0.15, sprayDensity: 16, falloff: 0.85, edgeDarken: 0.35 },
+        'gouache': { engine: 'ink', sizeScale: 1.6, opacity: 1.0, spacing: 0.03 },
+        'oil-brush': { engine: 'charcoal', sizeScale: 1.9, opacity: 0.85, spacing: 0.08, jitter: 1.0, grain: 0.9 },
+        'acrylic': { engine: 'ink', sizeScale: 1.35, opacity: 0.9, spacing: 0.05 },
+        'airbrush': { engine: 'spray', sizeScale: 2.2, opacity: 0.08, spacing: 0.25, sprayDensity: 35, falloff: 0.55, edgeDarken: 0.6 },
+        // Texture & effects
+        'charcoal-soft': { engine: 'charcoal', sizeScale: 1.2, opacity: 0.55, spacing: 0.08, jitter: 0.7, grain: 0.8 },
+        'charcoal-vine': { engine: 'charcoal', sizeScale: 1.0, opacity: 0.38, spacing: 0.1, jitter: 0.9, grain: 0.95 },
+        'pastel-chalk': { engine: 'charcoal', sizeScale: 1.4, opacity: 0.5, spacing: 0.09, jitter: 0.6, grain: 0.6 },
+        'watercolor-wash': { engine: 'ink', sizeScale: 2.1, opacity: 0.12, spacing: 0.2, softEdge: true, bloom: 0.9, edgeDarken: 0.9, splatter: 8, wander: 0.3 },
+        'watercolor-detail': { engine: 'ink', sizeScale: 1.0, opacity: 0.28, spacing: 0.1, softEdge: true, bloom: 0.4, edgeDarken: 0.6, splatter: 3, wander: 0.12 },
+        'ink-wash': { engine: 'ink', sizeScale: 1.3, opacity: 0.32, spacing: 0.1, softEdge: true, bloom: 0.25, edgeDarken: 0.35, splatter: 2, wander: 0.08 },
+        'spray-paint': { engine: 'spray', sizeScale: 2.4, opacity: 0.2, spacing: 0.2, sprayDensity: 26, falloff: 0.35, edgeDarken: 0.35 },
+        'glitter': { engine: 'spray', sizeScale: 1.4, opacity: 0.7, spacing: 0.16, sprayDensity: 6, sparkle: true, falloff: 0.9 },
+        'noise-grain': { engine: 'charcoal', sizeScale: 1.0, opacity: 0.45, spacing: 0.09, jitter: 0.5, grain: 1.0 },
+        'halftone': { engine: 'spray', sizeScale: 1.2, opacity: 0.5, spacing: 0.22, sprayDensity: 5, dotify: true, falloff: 0.2 },
+        'stamp-brush': { engine: 'ink', sizeScale: 1.0, opacity: 1.0, spacing: 0.3, stamp: true },
+        // Utility
+        'eraser-soft': { engine: 'ink', sizeScale: 1.5, opacity: 1.0, type: 'eraser', spacing: 0.05 },
+        'kneaded-eraser': { engine: 'ink', sizeScale: 1.2, opacity: 1.0, type: 'eraser', spacing: 0.08 },
+        'smudge-blender': { engine: 'smudge', sizeScale: 1.1, opacity: 0.28, spacing: 0.09 },
+        'smear-strong': { engine: 'smear', sizeScale: 1.5, opacity: 0.35, spacing: 0.12 },
+        'dodge-burn': { engine: 'dodgeburn', sizeScale: 1.0, opacity: 0.25, spacing: 0.06, strength: 0.25 },
+        'mixer-brush': { engine: 'mixer', sizeScale: 1.3, opacity: 0.4, spacing: 0.1 }
+    };
+    const BRUSH_TOOL_GROUPS = [
+        {
+            label: 'Core drawing',
+            items: [
+                { id: 'pencil-hb', label: 'Pencil (HB)', engine: 'pencil' },
+                { id: 'mechanical-pencil', label: 'Mechanical pencil', engine: 'pencil' },
+                { id: 'pen-hard-round', label: 'Pen (hard round)', engine: 'ink' },
+                { id: 'technical-pen', label: 'Technical pen', engine: 'ink' },
+                { id: 'fineliner', label: 'Fineliner', engine: 'ink' },
+                { id: 'brush-pen', label: 'Brush pen (pressure taper)', engine: 'ink' },
+                { id: 'calligraphy-pen', label: 'Calligraphy pen (angle + nib width)', engine: 'ink' },
+                { id: 'marker-felt', label: 'Marker (felt tip)', engine: 'marker' },
+                { id: 'marker-chisel', label: 'Chisel marker', engine: 'marker' }
+            ]
+        },
+        {
+            label: 'Painting',
+            items: [
+                { id: 'round-paint-soft', label: 'Round paint brush (soft/hard)', engine: 'ink' },
+                { id: 'flat-brush', label: 'Flat brush', engine: 'ink' },
+                { id: 'filbert', label: 'Filbert', engine: 'ink' },
+                { id: 'fan-brush', label: 'Fan brush', engine: 'spray' },
+                { id: 'gouache', label: 'Gouache (opaque paint)', engine: 'ink' },
+                { id: 'oil-brush', label: 'Oil brush (thick, smudge-y)', engine: 'charcoal' },
+                { id: 'acrylic', label: 'Acrylic (semi-opaque)', engine: 'ink' },
+                { id: 'airbrush', label: 'Airbrush (soft spray)', engine: 'spray' }
+            ]
+        },
+        {
+            label: 'Texture & effects',
+            items: [
+                { id: 'charcoal-soft', label: 'Charcoal (soft grain)', engine: 'charcoal' },
+                { id: 'charcoal-vine', label: 'Vine charcoal (lighter)', engine: 'charcoal' },
+                { id: 'pastel-chalk', label: 'Pastel / Chalk', engine: 'charcoal' },
+                { id: 'watercolor-wash', label: 'Watercolor wash (edge bleed)', engine: 'ink' },
+                { id: 'watercolor-detail', label: 'Watercolor detail', engine: 'ink' },
+                { id: 'ink-wash', label: 'Ink wash', engine: 'ink' },
+                { id: 'spray-paint', label: 'Spray paint', engine: 'spray' },
+                { id: 'glitter', label: 'Glitter / sparkle (controlled scatter)', engine: 'spray' },
+                { id: 'noise-grain', label: 'Noise / grain brush', engine: 'charcoal' },
+                { id: 'halftone', label: 'Halftone / comic dot brush', engine: 'spray' },
+                { id: 'stamp-brush', label: 'Stamp brush (custom shapes)', engine: 'ink' }
+            ]
+        },
+        {
+            label: 'Utility brushes',
+            items: [
+                { id: 'eraser-soft', label: 'Eraser brush (soft/hard)', type: 'eraser' },
+                { id: 'kneaded-eraser', label: '"kneaded" eraser', type: 'eraser' },
+                { id: 'smudge-blender', label: 'Smudge blender (soft)', engine: 'charcoal' },
+                { id: 'smear-strong', label: 'Smear (strong)', engine: 'charcoal' },
+                { id: 'dodge-burn', label: 'Dodge/Burn style brush (lighten/darken)', engine: 'ink' },
+                { id: 'mixer-brush', label: 'Mixer brush (mixes colors like wet paint)', engine: 'charcoal' }
+            ]
+        },
+        {
+            label: 'Tools',
+            items: [
+                { id: 'tool-pan', label: 'Pan (hand)', type: 'tool', tool: 'pan' },
+                { id: 'tool-zoom', label: 'Zoom', type: 'tool', tool: 'zoom', disabled: true },
+                { id: 'tool-rotate', label: 'Rotate canvas', type: 'tool', disabled: true },
+                { id: 'tool-fit', label: 'Fit to screen / reset rotation', type: 'tool', tool: 'reset', disabled: true },
+                { id: 'tool-rulers', label: 'Rulers / guides / snapping grid', type: 'tool', tool: 'ruler' },
+                { id: 'tool-lasso', label: 'Lasso select (freehand)', type: 'tool', disabled: true },
+                { id: 'tool-marquee', label: 'Marquee select (rect/ellipse)', type: 'tool', disabled: true },
+                { id: 'tool-magic-wand', label: 'Magic wand (tolerance)', type: 'tool', disabled: true },
+                { id: 'tool-feather', label: 'Feather/expand/contract selection', type: 'tool', disabled: true },
+                { id: 'tool-transform', label: 'Transform: move/scale/rotate/skew/warp', type: 'tool', disabled: true },
+                { id: 'tool-free-transform', label: 'Free transform with corner handles + aspect lock', type: 'tool', disabled: true },
+                { id: 'tool-line', label: 'Line tool', type: 'tool', tool: 'shape-line' },
+                { id: 'tool-shapes', label: 'Shape tools: rectangle, ellipse, polygon, star', type: 'tool', tool: 'shapes' },
+                { id: 'tool-bezier', label: 'Bézier/pen tool (paths)', type: 'tool', disabled: true },
+                { id: 'tool-stabilizer', label: 'Stabilizer / smoothing (for clean lines)', type: 'tool', disabled: true },
+                { id: 'tool-symmetry', label: 'Symmetry: vertical/horizontal/radial', type: 'tool', disabled: true },
+                { id: 'tool-perspective', label: 'Perspective guides (1/2/3 point)', type: 'tool', disabled: true },
+                { id: 'tool-mirror', label: 'Mirror drawing', type: 'tool', disabled: true },
+                { id: 'tool-bucket', label: 'Bucket fill (tolerance, "fill gaps")', type: 'tool', tool: 'fill' },
+                { id: 'tool-gradient', label: 'Gradient (linear/radial)', type: 'tool', disabled: true },
+                { id: 'tool-eyedropper', label: 'Eyedropper', type: 'tool', disabled: true },
+                { id: 'tool-color-picker', label: 'Color picker: wheel + sliders (HSV/RGB) + hex', type: 'tool', disabled: true },
+                { id: 'tool-palettes', label: 'Palettes / swatches', type: 'tool', disabled: true },
+                { id: 'tool-harmony', label: 'Harmony modes (complementary, triad, analogous)', type: 'tool', disabled: true },
+                { id: 'tool-layers', label: 'Create/duplicate/group layers', type: 'tool', disabled: true },
+                { id: 'tool-opacity-blend', label: 'Opacity + blend modes (normal/multiply/screen/overlay, etc.)', type: 'tool', disabled: true },
+                { id: 'tool-clip-mask', label: 'Clip/mask layers', type: 'tool', disabled: true },
+                { id: 'tool-layer-masks', label: 'Layer masks', type: 'tool', disabled: true },
+                { id: 'tool-alpha-lock', label: 'Alpha lock', type: 'tool', disabled: true },
+                { id: 'tool-lock', label: 'Lock pixels / lock position', type: 'tool', disabled: true },
+                { id: 'tool-hue-sat', label: 'Hue/Saturation', type: 'tool', disabled: true },
+                { id: 'tool-brightness', label: 'Brightness/Contrast', type: 'tool', disabled: true },
+                { id: 'tool-levels', label: 'Levels/Curves (optional but loved)', type: 'tool', disabled: true },
+                { id: 'tool-blur', label: 'Blur (gaussian/motion)', type: 'tool', disabled: true },
+                { id: 'tool-sharpen', label: 'Sharpen', type: 'tool', disabled: true },
+                { id: 'tool-noise', label: 'Noise/grain', type: 'tool', disabled: true },
+                { id: 'tool-liquify', label: 'Liquify (push/pull) (very "pro" feature)', type: 'tool', disabled: true },
+                { id: 'tool-text', label: 'Text tool (fonts, size, tracking, warp)', type: 'tool', tool: 'text' },
+                { id: 'tool-text-path', label: 'Text-on-path (nice-to-have)', type: 'tool', disabled: true },
+                { id: 'tool-undo', label: 'Undo/redo history', type: 'tool', tool: 'undo' },
+                { id: 'tool-autosave', label: 'Autosave / version snapshots', type: 'tool', disabled: true },
+                { id: 'tool-export', label: 'Export PNG/JPG/WebP/SVG/PSD-like JSON', type: 'tool', tool: 'save' },
+                { id: 'tool-brush-import', label: 'Brush import/export + custom brush editor', type: 'tool', disabled: true },
+                { id: 'tool-shortcuts', label: 'Shortcut customization (power users)', type: 'tool', disabled: true },
+                { id: 'tool-brush-settings', label: 'Brush settings (the "make it feel pro" checklist)', type: 'tool', disabled: true }
+            ]
+        }
+    ];
+
+    function populateBrushToolSelect() {
+        if (!brushTextureSelect) return;
+        brushTextureSelect.innerHTML = '';
+
+        BRUSH_TOOL_GROUPS.forEach(group => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+            group.items.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.id;
+                opt.textContent = item.label + (item.disabled ? ' (coming soon)' : '');
+                if (item.disabled) opt.disabled = true;
+                if (item.type) opt.dataset.type = item.type;
+                if (item.engine) opt.dataset.engine = item.engine;
+                if (item.tool) opt.dataset.tool = item.tool;
+                optgroup.appendChild(opt);
+            });
+            brushTextureSelect.appendChild(optgroup);
+        });
+
+        const initialOpt = brushTextureSelect.querySelector(`option[value="${DEFAULT_BRUSH_PRESET}"]`) || brushTextureSelect.querySelector('option:not([disabled])');
+        if (initialOpt) {
+            brushTextureSelect.value = initialOpt.value;
+            applyBrushToolSelection(initialOpt.value, { silent: true });
+        }
+    }
+
+    function handleToolPresetAction(toolId, label = '') {
+        switch (toolId) {
+            case 'pan':
+                activatePanTool();
+                break;
+            case 'fill':
+                activateFillTool();
+                break;
+            case 'shape-line':
+                state.activeTool = 'shape';
+                state.activeShape = 'line';
+                updateToolButtons();
+                updateToolStatus();
+                showToast('Line tool selected');
+                break;
+            case 'shapes':
+                openShapesPanel();
+                break;
+            case 'ruler':
+                openRuler();
+                break;
+            case 'text':
+                activateTextTool();
+                break;
+            case 'undo':
+                undo();
+                break;
+            case 'save':
+                saveImage();
+                break;
+            case 'reset':
+                resetZoom();
+                break;
+            default:
+                if (label) {
+                    showToast(`${label} not available yet`);
+                }
+                break;
+        }
+    }
+
+    function applyBrushToolSelection(presetId, options = {}) {
+        const { silent = false } = options;
+        if (!brushTextureSelect) return;
+        const opt = brushTextureSelect.querySelector(`option[value="${presetId}"]`);
+        if (!opt || opt.disabled) {
+            return;
+        }
+
+        const type = opt.dataset.type || 'brush';
+        const engine = opt.dataset.engine || 'ink';
+        const tool = opt.dataset.tool || null;
+        const label = opt.textContent.replace(' (coming soon)', '');
+
+        // Apply config for visual differentiation
+        const presetConfig = BRUSH_PRESETS[presetId] || { engine };
+        state.currentBrushConfig = presetConfig;
+
+        state.currentBrushPreset = presetId;
+        state.currentBrushLabel = label;
+
+        if (type === 'tool') {
+            state.isEraser = false;
+            handleToolPresetAction(tool, label);
+        } else if (type === 'eraser') {
+            state.isEraser = true;
+            state.activeTool = 'eraser';
+            state.currentTexture = presetConfig.engine || engine || 'ink';
+            if (brushEraserToggle) {
+                brushEraserToggle.textContent = 'Eraser';
+                brushEraserToggle.classList.add('active');
+            }
+        } else {
+            state.isEraser = false;
+            state.activeTool = 'brush';
+            state.currentTexture = presetConfig.engine || engine;
+            state.lastBrushPreset = presetId;
+            if (brushEraserToggle) {
+                brushEraserToggle.textContent = 'Brush';
+                brushEraserToggle.classList.add('active');
+            }
+        }
+
+        updateToolButtons();
+        updateToolStatus();
+
+        if (!silent && label) {
+            const noun = (type === 'tool') ? 'tool' : (type === 'eraser' ? 'eraser' : 'brush');
+            showToast(`${label} ${noun} selected`);
+        }
+    }
 
     // Color utility functions
     const ColorUtils = {
@@ -821,7 +1094,7 @@
 
         // Brush texture
         brushTextureSelect.addEventListener('change', function() {
-            state.currentTexture = this.value;
+            applyBrushToolSelection(this.value);
         });
 
         // Brush/Eraser toggle
@@ -1775,6 +2048,16 @@
         brushEraserToggle.classList.toggle('active', state.isEraser);
         state.activeTool = state.isEraser ? 'eraser' : 'brush';
         state.activeShape = null; // Clear shape mode
+        if (brushTextureSelect) {
+            if (state.isEraser) {
+                brushTextureSelect.value = DEFAULT_ERASER_PRESET;
+                applyBrushToolSelection(DEFAULT_ERASER_PRESET, { silent: true });
+            } else {
+                const target = state.lastBrushPreset || DEFAULT_BRUSH_PRESET;
+                brushTextureSelect.value = target;
+                applyBrushToolSelection(target, { silent: true });
+            }
+        }
         updateToolButtons();
         updateToolStatus();
     }
@@ -1847,9 +2130,9 @@
         if (state.activeTool === 'shape' && state.activeShape) {
             statusText += `Shape / ${state.activeShape}`;
         } else if (state.activeTool === 'brush') {
-            statusText += 'Brush';
+            statusText += state.currentBrushLabel ? `Brush / ${state.currentBrushLabel}` : 'Brush';
         } else if (state.activeTool === 'eraser') {
-            statusText += 'Eraser';
+            statusText += state.currentBrushLabel ? `Eraser / ${state.currentBrushLabel}` : 'Eraser';
         } else if (state.activeTool === 'select') {
             statusText += 'Select';
         } else if (state.activeTool === 'text') {
@@ -2602,40 +2885,74 @@
             return;
         }
         
-        // Get normalized pressure for all input types
-        const pressure = normalizePressure(e);
-        
-        // Calculate size with pressure
-        const size = state.currentSize * pressure;
-        
-        // Draw based on texture
-        if (state.isEraser) {
-            drawEraser(state.lastX, state.lastY, x, y, size);
-        } else {
-            switch (state.currentTexture) {
-                case 'ink':
-                    drawInk(state.lastX, state.lastY, x, y, size);
-                    break;
-                case 'pencil':
-                    drawPencil(state.lastX, state.lastY, x, y, size);
-                    break;
-                case 'marker':
-                    drawMarker(state.lastX, state.lastY, x, y, size);
-                    break;
-                case 'spray':
-                    drawSpray(state.lastX, state.lastY, x, y, size);
-                    break;
-                case 'charcoal':
-                    drawCharcoal(state.lastX, state.lastY, x, y, size);
-                    break;
+        const cfg = state.currentBrushConfig || {};
+
+        // Use coalesced events when available to avoid gaps during fast strokes
+        const events = (typeof e.getCoalescedEvents === 'function') ? e.getCoalescedEvents() : [e];
+        const rectForCoalesced = drawCanvas.getBoundingClientRect();
+
+        const drawSegment = (prevX, prevY, px, py, pressure, size) => {
+            const dx = px - prevX;
+            const dy = py - prevY;
+            const dist = Math.hypot(dx, dy);
+            const spacingFactor = cfg.spacing ? Math.max(0.2, cfg.spacing * 10) : 0.7;
+            const stepLen = Math.max(0.8, size * spacingFactor);
+            const steps = Math.max(1, Math.ceil(dist / stepLen));
+            for (let i = 1; i <= steps; i++) {
+                const t = i / steps;
+                const ix = prevX + dx * t;
+                const iy = prevY + dy * t;
+                if (state.isEraser) {
+                    drawEraser(state.lastX, state.lastY, ix, iy, size, cfg);
+                } else {
+                    switch (state.currentTexture) {
+                        case 'ink':
+                            drawInk(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'pencil':
+                            drawPencil(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'marker':
+                            drawMarker(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'spray':
+                            drawSpray(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'charcoal':
+                            drawCharcoal(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'smudge':
+                            drawSmudge(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'smear':
+                            drawSmear(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'dodgeburn':
+                            drawDodgeBurn(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                        case 'mixer':
+                            drawMixer(state.lastX, state.lastY, ix, iy, size, cfg);
+                            break;
+                    }
+                }
+                Sync.createStrokePoint(ix, iy, pressure);
+                state.lastX = ix;
+                state.lastY = iy;
             }
-        }
-        
-        // Create sync event
-        Sync.createStrokePoint(x, y, pressure);
-        
-        state.lastX = x;
-        state.lastY = y;
+        };
+
+        events.forEach(ev => {
+            const evScreenX = ev.clientX - rectForCoalesced.left;
+            const evScreenY = ev.clientY - rectForCoalesced.top;
+            const evWorld = screenToWorld(evScreenX, evScreenY);
+            const px = evWorld.x;
+            const py = evWorld.y;
+
+            const pressure = normalizePressure(ev);
+            const size = state.currentSize * pressure;
+
+            drawSegment(state.lastX, state.lastY, px, py, pressure, size);
+        });
     }
 
     function stopDrawing(e) {
@@ -2727,99 +3044,471 @@
     }
 
     // Brush texture implementations
-    function drawInk(x1, y1, x2, y2, size) {
+    function drawInk(x1, y1, x2, y2, size, cfg = {}) {
+        ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
-        ctx.lineWidth = size;
-        ctx.globalAlpha = 1;
-        
-        // Smooth line with quadratic curve
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.quadraticCurveTo(x1, y1, midX, midY);
-        ctx.stroke();
-    }
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-    function drawPencil(x1, y1, x2, y2, size) {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = state.currentColor;
-        ctx.lineWidth = size * 0.7;
-        ctx.globalAlpha = 0.6;
-        
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.quadraticCurveTo(x1, y1, midX, midY);
-        ctx.stroke();
-    }
+        const sizeScale = cfg.sizeScale || 1;
+        const baseWidth = size * sizeScale;
+        const spacing = cfg.spacing || 0;
+        const strokeLen = Math.hypot(x2 - x1, y2 - y1);
+        const wander = cfg.wander || 0;
+        const taperFactor = cfg.taper ? 0.65 + 0.35 * Math.exp(-strokeLen * 0.08) : 1;
+        ctx.lineWidth = baseWidth * taperFactor;
+        ctx.globalAlpha = cfg.opacity ?? 1;
 
-    function drawMarker(x1, y1, x2, y2, size) {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = state.currentColor;
-        ctx.lineWidth = size * 1.5;
-        ctx.globalAlpha = 0.5;
-        
-        const midX = (x1 + x2) / 2;
-        const midY = (y1 + y2) / 2;
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.quadraticCurveTo(x1, y1, midX, midY);
-        ctx.stroke();
-    }
-
-    function drawSpray(x1, y1, x2, y2, size) {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.fillStyle = state.currentColor;
-        ctx.globalAlpha = 0.1;
-        
-        const distance = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-        const steps = Math.max(1, Math.floor(distance / 2));
-        
-        for (let i = 0; i < steps; i++) {
-            const t = i / steps;
-            const x = x1 + (x2 - x1) * t;
-            const y = y1 + (y2 - y1) * t;
-            
-            // Scatter dots
-            for (let j = 0; j < 10; j++) {
-                const offsetX = (Math.random() - 0.5) * size * 2;
-                const offsetY = (Math.random() - 0.5) * size * 2;
-                
+        // Optional spacing/dotify for halftone/stamp-like behavior
+        if (spacing > 0.12 && cfg.dotify) {
+            const step = Math.max(1, strokeLen * spacing);
+            const steps = Math.max(1, Math.floor(strokeLen / step));
+            for (let i = 0; i <= steps; i++) {
+                const t = i / Math.max(steps, 1);
+                const px = x1 + (x2 - x1) * t;
+                const py = y1 + (y2 - y1) * t;
                 ctx.beginPath();
-                ctx.arc(x + offsetX, y + offsetY, 1, 0, Math.PI * 2);
+                ctx.arc(px, py, Math.max(0.6, ctx.lineWidth * 0.35), 0, Math.PI * 2);
+                ctx.fillStyle = state.currentColor;
                 ctx.fill();
             }
+            ctx.restore();
+            return;
         }
+
+        if (cfg.stamp && spacing > 0.15) {
+            const step = Math.max(1, strokeLen * spacing);
+            const steps = Math.max(1, Math.floor(strokeLen / step));
+            for (let i = 0; i <= steps; i++) {
+                const t = i / Math.max(steps, 1);
+                const px = x1 + (x2 - x1) * t;
+                const py = y1 + (y2 - y1) * t;
+                ctx.beginPath();
+                ctx.rect(px - ctx.lineWidth * 0.6, py - ctx.lineWidth * 0.6, ctx.lineWidth * 1.2, ctx.lineWidth * 1.2);
+                ctx.fillStyle = state.currentColor;
+                ctx.fill();
+            }
+            ctx.restore();
+            return;
+        }
+
+        if (cfg.softEdge) {
+            ctx.shadowColor = state.currentColor;
+            ctx.shadowBlur = ctx.lineWidth * 0.45;
+        }
+        
+        // Smooth line with quadratic curve
+        const jitterX = (Math.random() - 0.5) * baseWidth * wander;
+        const jitterY = (Math.random() - 0.5) * baseWidth * wander;
+        const midX = (x1 + x2) / 2 + jitterX;
+        const midY = (y1 + y2) / 2 + jitterY;
+        
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(x1, y1, midX, midY);
+        ctx.stroke();
+
+        // Watercolor edges and bloom
+        if (cfg.edgeDarken) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.lineWidth = ctx.lineWidth * (1.2 + cfg.edgeDarken * 0.8);
+            ctx.globalAlpha = (cfg.opacity ?? 1) * 0.35 * cfg.edgeDarken;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(x1, y1, midX, midY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        if (cfg.bloom) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            ctx.lineWidth = ctx.lineWidth * (1.1 + cfg.bloom * 0.6);
+            ctx.shadowColor = state.currentColor;
+            ctx.shadowBlur = ctx.lineWidth * (1.2 + cfg.bloom * 0.8);
+            ctx.globalAlpha = (cfg.opacity ?? 1) * 0.28 * cfg.bloom;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.quadraticCurveTo(x1, y1, midX, midY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        if (cfg.splatter) {
+            const drops = Math.max(1, Math.floor(cfg.splatter));
+            for (let i = 0; i < drops; i++) {
+                const t = Math.random();
+                const px = x1 + (x2 - x1) * t + (Math.random() - 0.5) * baseWidth * 1.1;
+                const py = y1 + (y2 - y1) * t + (Math.random() - 0.5) * baseWidth * 1.1;
+                const r = Math.max(0.8, baseWidth * (0.15 + Math.random() * 0.25));
+                ctx.save();
+                ctx.globalAlpha = (cfg.opacity ?? 1) * (0.25 + Math.random() * 0.4);
+                ctx.beginPath();
+                ctx.arc(px, py, r, 0, Math.PI * 2);
+                ctx.fillStyle = state.currentColor;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+        ctx.restore();
     }
 
-    function drawCharcoal(x1, y1, x2, y2, size) {
+    function drawPencil(x1, y1, x2, y2, size, cfg = {}) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.strokeStyle = state.currentColor;
+        ctx.fillStyle = state.currentColor;
+        ctx.lineCap = 'round';
+
+        const sizeScale = cfg.sizeScale || 1;
+        const baseWidth = size * 0.55 * sizeScale;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.max(1, Math.ceil(dist / Math.max(0.5, baseWidth * 0.9)));
+        const jitter = baseWidth * (cfg.jitter ?? 0.5);
+        const grain = cfg.grain ?? 0.6;
+        let prevX = x1;
+        let prevY = y1;
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t + (Math.random() - 0.5) * jitter;
+            const py = y1 + dy * t + (Math.random() - 0.5) * jitter;
+            ctx.globalAlpha = (cfg.opacity ?? 0.6) * (0.8 + Math.random() * 0.35);
+            ctx.lineWidth = baseWidth * (0.6 + Math.random() * 0.6);
+            ctx.beginPath();
+            ctx.moveTo(prevX, prevY);
+            ctx.lineTo(px, py);
+            ctx.stroke();
+            prevX = px;
+            prevY = py;
+        }
+
+        // Graphite grain speckle along the stroke
+        const specks = Math.max(1, Math.floor(steps * 3 * grain));
+        ctx.globalAlpha = (cfg.opacity ?? 0.6) * 0.45;
+        for (let i = 0; i < specks; i++) {
+            const t = Math.random();
+            const px = x1 + dx * t + (Math.random() - 0.5) * baseWidth;
+            const py = y1 + dy * t + (Math.random() - 0.5) * baseWidth;
+            const dot = Math.max(0.4, baseWidth * 0.18 * (0.5 + Math.random()));
+            ctx.beginPath();
+            ctx.arc(px, py, dot, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    function drawMarker(x1, y1, x2, y2, size, cfg = {}) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = state.currentColor;
+        ctx.strokeStyle = state.currentColor;
+        ctx.lineCap = 'butt';
+
+        const sizeScale = cfg.sizeScale || 1;
+        const baseWidth = size * 1.5 * sizeScale;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const spacing = cfg.spacing || 0.05;
+        const step = Math.max(baseWidth * 0.65, dist * spacing);
+        const steps = Math.max(1, Math.ceil(dist / step));
+        const travelAngle = Math.atan2(dy, dx);
+        const nibAngle = ((cfg.angle || 0) * Math.PI) / 180;
+        
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(travelAngle + nibAngle);
+            ctx.globalAlpha = cfg.opacity ?? 0.5;
+            ctx.fillRect(-step * 0.6, -baseWidth / 2, step * 1.2, baseWidth);
+            if (cfg.streaks) {
+                const streaks = 3;
+                const streakAlpha = Math.min(1, (cfg.opacity ?? 0.5) * 0.5 * cfg.streaks);
+                ctx.globalAlpha = streakAlpha;
+                for (let s = 0; s < streaks; s++) {
+                    const offset = (s - streaks / 2) * (baseWidth / streaks);
+                    const streakWidth = baseWidth * 0.18 * (0.8 + Math.random() * 0.6);
+                    ctx.fillRect(-step * 0.5, offset - streakWidth / 2, step, streakWidth);
+                }
+            }
+            ctx.restore();
+        }
+        ctx.restore();
+    }
+
+    function drawSpray(x1, y1, x2, y2, size, cfg = {}) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = state.currentColor;
+
+        const distance = Math.hypot(x2 - x1, y2 - y1);
+        const spraySize = size * (cfg.sizeScale || 1);
+        const dotCount = cfg.sprayDensity || 10;
+        const falloff = cfg.falloff ?? 0.65;
+        const opacity = cfg.opacity ?? 0.1;
+        const stepLen = Math.max(1, spraySize * 0.5);
+        const steps = Math.max(1, Math.ceil(distance / stepLen));
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / Math.max(steps, 1);
+            const x = x1 + (x2 - x1) * t;
+            const y = y1 + (y2 - y1) * t;
+            for (let j = 0; j < dotCount; j++) {
+                const radius = spraySize * Math.pow(Math.random(), falloff);
+                const theta = Math.random() * Math.PI * 2;
+                const offsetX = Math.cos(theta) * radius;
+                const offsetY = Math.sin(theta) * radius;
+                const dotSize = Math.max(0.6, spraySize * 0.1 * (0.6 + Math.random()));
+                ctx.globalAlpha = opacity * (0.6 + Math.random() * 0.6);
+                ctx.beginPath();
+                ctx.arc(x + offsetX, y + offsetY, dotSize, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (cfg.edgeDarken) {
+                const ringDots = Math.max(2, Math.floor(dotCount * cfg.edgeDarken));
+                const outerR = spraySize * (0.65 + Math.random() * 0.4);
+                for (let k = 0; k < ringDots; k++) {
+                    const theta = Math.random() * Math.PI * 2;
+                    const offsetX = Math.cos(theta) * outerR;
+                    const offsetY = Math.sin(theta) * outerR;
+                    const dotSize = Math.max(0.5, spraySize * 0.08 * (0.6 + Math.random()));
+                    ctx.globalAlpha = Math.min(1, opacity * 1.5 * cfg.edgeDarken);
+                    ctx.beginPath();
+                    ctx.arc(x + offsetX, y + offsetY, dotSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    function drawCharcoal(x1, y1, x2, y2, size, cfg = {}) {
+        ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = state.currentColor;
-        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = state.currentColor;
+        ctx.lineCap = 'round';
         
-        // Draw multiple jittered strokes
-        for (let i = 0; i < 3; i++) {
-            const offsetX = (Math.random() - 0.5) * size * 0.5;
-            const offsetY = (Math.random() - 0.5) * size * 0.5;
-            
-            ctx.lineWidth = size * (0.8 + Math.random() * 0.4);
-            
+        const opacity = cfg.opacity ?? 0.4;
+        const sizeScale = cfg.sizeScale || 1;
+        const baseWidth = size * sizeScale;
+        const jitterScale = cfg.jitter || 0.5;
+        const grain = cfg.grain ?? 0.7;
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const passes = 4;
+        for (let i = 0; i < passes; i++) {
+            const jitter = baseWidth * jitterScale * (0.6 + Math.random() * 0.8);
+            const offsetX = (Math.random() - 0.5) * jitter;
+            const offsetY = (Math.random() - 0.5) * jitter;
+            ctx.lineWidth = baseWidth * (0.5 + Math.random() * 0.8);
+            ctx.globalAlpha = opacity * (0.6 + Math.random() * 0.4);
             ctx.beginPath();
             ctx.moveTo(x1 + offsetX, y1 + offsetY);
             ctx.lineTo(x2 + offsetX, y2 + offsetY);
             ctx.stroke();
         }
+
+        // Speckled grain along the stroke
+        const specks = Math.max(2, Math.floor(dist * grain));
+        ctx.globalAlpha = Math.min(1, opacity * 0.9);
+        for (let i = 0; i < specks; i++) {
+            const t = Math.random();
+            const px = x1 + dx * t + (Math.random() - 0.5) * baseWidth;
+            const py = y1 + dy * t + (Math.random() - 0.5) * baseWidth;
+            const dot = Math.max(0.5, baseWidth * 0.15 * (0.7 + Math.random()));
+            ctx.beginPath();
+            ctx.arc(px, py, dot, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
     }
 
-    function drawEraser(x1, y1, x2, y2, size) {
+    function drawSmudge(x1, y1, x2, y2, size, cfg = {}) {
+        const radius = Math.max(2, size * (cfg.sizeScale || 1));
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius * 0.6)));
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            const ox = (dx / dist) * radius * 0.4;
+            const oy = (dy / dist) * radius * 0.4;
+            const w = radius * 2;
+            const h = radius * 2;
+            try {
+                const img = ctx.getImageData(px - radius, py - radius, w, h);
+                ctx.putImageData(img, px - radius + ox, py - radius + oy);
+            } catch (err) {
+                // Ignore sampling outside canvas
+            }
+        }
+    }
+
+    function drawSmear(x1, y1, x2, y2, size, cfg = {}) {
+        const radius = Math.max(3, size * (cfg.sizeScale || 1));
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius * 0.5)));
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            const ox = (dx / dist) * radius * 0.7;
+            const oy = (dy / dist) * radius * 0.7;
+            const w = radius * 2.2;
+            const h = radius * 2.2;
+            try {
+                const img = ctx.getImageData(px - radius, py - radius, w, h);
+                // Light blur to avoid hard edges while smearing
+                const off = document.createElement('canvas');
+                off.width = w;
+                off.height = h;
+                const octx = off.getContext('2d');
+                octx.putImageData(img, 0, 0);
+                octx.filter = 'blur(0.8px)';
+                octx.globalAlpha = cfg.opacity ?? 0.35;
+                ctx.save();
+                ctx.globalAlpha = cfg.opacity ?? 0.35;
+                ctx.drawImage(off, px - radius + ox, py - radius + oy);
+                ctx.restore();
+            } catch (err) {
+                // Ignore sampling outside canvas
+            }
+        }
+    }
+
+    function drawDodgeBurn(x1, y1, x2, y2, size, cfg = {}) {
+        const radius = Math.max(3, size * (cfg.sizeScale || 1));
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius * 0.6)));
+        const strength = cfg.strength ?? 0.2;
+        let lighten = true; // alternate along stroke
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            const w = Math.ceil(radius * 2);
+            const h = Math.ceil(radius * 2);
+            try {
+                const img = ctx.getImageData(px - radius, py - radius, w, h);
+                const data = img.data;
+                for (let y = 0; y < h; y++) {
+                    for (let x = 0; x < w; x++) {
+                        const dxp = x - radius;
+                        const dyp = y - radius;
+                        const d = Math.hypot(dxp, dyp);
+                        if (d > radius) continue;
+                        const falloff = 1 - d / radius;
+                        const idx = (y * w + x) * 4;
+                        const a = data[idx + 3] / 255;
+                        if (a === 0) continue;
+                        const amt = strength * falloff;
+                        if (lighten) {
+                            data[idx] = Math.min(255, data[idx] + (255 - data[idx]) * amt);
+                            data[idx + 1] = Math.min(255, data[idx + 1] + (255 - data[idx + 1]) * amt);
+                            data[idx + 2] = Math.min(255, data[idx + 2] + (255 - data[idx + 2]) * amt);
+                        } else {
+                            data[idx] = Math.max(0, data[idx] * (1 - amt));
+                            data[idx + 1] = Math.max(0, data[idx + 1] * (1 - amt));
+                            data[idx + 2] = Math.max(0, data[idx + 2] * (1 - amt));
+                        }
+                    }
+                }
+                ctx.putImageData(img, px - radius, py - radius);
+            } catch (err) {
+                // Ignore sampling outside canvas
+            }
+            lighten = !lighten;
+        }
+    }
+
+    function drawMixer(x1, y1, x2, y2, size, cfg = {}) {
+        const radius = Math.max(3, size * (cfg.sizeScale || 1));
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy) || 0.001;
+        const steps = Math.max(1, Math.ceil(dist / Math.max(2, radius * 0.6)));
+        let carry = drawMixer._carry || null; // Persist last picked color to avoid black when no pixels under the nib
+        for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            const px = x1 + dx * t;
+            const py = y1 + dy * t;
+            const w = radius * 2;
+            const h = radius * 2;
+            try {
+                const img = ctx.getImageData(px - radius, py - radius, w, h);
+                const data = img.data;
+                let r = 0, g = 0, b = 0, c = 0;
+                for (let k = 0; k < data.length; k += 4) {
+                    const alpha = data[k + 3] / 255;
+                    if (alpha > 0) {
+                        r += data[k] * alpha;
+                        g += data[k + 1] * alpha;
+                        b += data[k + 2] * alpha;
+                        c += alpha;
+                    }
+                }
+                if (c > 0) {
+                    r = Math.round(r / c);
+                    g = Math.round(g / c);
+                    b = Math.round(b / c);
+                    carry = carry
+                        ? {
+                            r: Math.round(carry.r * 0.35 + r * 0.65),
+                            g: Math.round(carry.g * 0.35 + g * 0.65),
+                            b: Math.round(carry.b * 0.35 + b * 0.65)
+                        }
+                        : { r, g, b };
+                }
+
+                if (carry) {
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'source-over';
+                    ctx.strokeStyle = `rgba(${carry.r},${carry.g},${carry.b},${cfg.opacity ?? 0.55})`;
+                    ctx.lineWidth = radius * 1.1;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(px, py);
+                    ctx.stroke();
+                    ctx.restore();
+
+                    // Lightly smudge underlying pixels with the picked color for a wet look
+                    const ox = (Math.random() - 0.5) * radius * 0.4;
+                    const oy = (Math.random() - 0.5) * radius * 0.4;
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'overlay';
+                    ctx.fillStyle = `rgba(${carry.r},${carry.g},${carry.b},${(cfg.opacity ?? 0.55) * 0.35})`;
+                    ctx.beginPath();
+                    ctx.arc(px + ox, py + oy, radius * 0.9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            } catch (err) {
+                // Ignore sampling outside canvas
+            }
+        }
+        drawMixer._carry = carry;
+    }
+
+    function drawEraser(x1, y1, x2, y2, size, cfg = {}) {
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = size * 2;
+        ctx.lineWidth = size * 2 * (cfg.sizeScale || 1);
         ctx.globalAlpha = 1;
         
         const midX = (x1 + x2) / 2;
@@ -3220,6 +3909,9 @@
         
         // Load canvas
         loadCanvasFromStorage();
+
+        // Build Brushes & Tools dropdown after initial load
+        populateBrushToolSelect();
     }
 
     // Walkthrough modal functions
@@ -5852,38 +6544,47 @@
         // Draw remote stroke with specified brush
         drawRemoteStroke(x1, y1, x2, y2, brush, pressure) {
             const size = brush.size * pressure;
+            const cfg = BRUSH_PRESETS[brush.preset || 'pen-hard-round'] || {};
             
             if (brush.erase) {
-                drawEraser(x1, y1, x2, y2, size);
+                drawEraser(x1, y1, x2, y2, size, cfg);
             } else {
-                // Save current state
                 const savedColor = state.currentColor;
                 const savedTexture = state.currentTexture;
-                
-                // Apply remote brush
                 state.currentColor = brush.color;
-                state.currentTexture = brush.texture;
-                
-                // Draw
-                switch (brush.texture) {
+                state.currentTexture = cfg.engine || brush.texture;
+                switch (state.currentTexture) {
                     case 'ink':
-                        drawInk(x1, y1, x2, y2, size);
+                        drawInk(x1, y1, x2, y2, size, cfg);
                         break;
                     case 'pencil':
-                        drawPencil(x1, y1, x2, y2, size);
+                        drawPencil(x1, y1, x2, y2, size, cfg);
                         break;
                     case 'marker':
-                        drawMarker(x1, y1, x2, y2, size);
+                        drawMarker(x1, y1, x2, y2, size, cfg);
                         break;
                     case 'spray':
-                        drawSpray(x1, y1, x2, y2, size);
+                        drawSpray(x1, y1, x2, y2, size, cfg);
                         break;
                     case 'charcoal':
-                        drawCharcoal(x1, y1, x2, y2, size);
+                        drawCharcoal(x1, y1, x2, y2, size, cfg);
+                        break;
+                        case 'smudge':
+                            drawSmudge(x1, y1, x2, y2, size, cfg);
+                            break;
+                        case 'smear':
+                            drawSmear(x1, y1, x2, y2, size, cfg);
+                            break;
+                        case 'dodgeburn':
+                            drawDodgeBurn(x1, y1, x2, y2, size, cfg);
+                            break;
+                        case 'mixer':
+                            drawMixer(x1, y1, x2, y2, size, cfg);
+                            break;
+                    default:
+                        drawInk(x1, y1, x2, y2, size, cfg);
                         break;
                 }
-                
-                // Restore state
                 state.currentColor = savedColor;
                 state.currentTexture = savedTexture;
             }
