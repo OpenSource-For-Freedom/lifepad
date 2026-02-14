@@ -923,11 +923,11 @@
 
         // Drawing events – attach pointer; also attach touch/mouse as safety net
         if (supportsPointerEvents) {
-            drawCanvas.addEventListener('pointerdown', (e) => { pointerEventSeen = true; startDrawing(e); });
-            drawCanvas.addEventListener('pointermove', draw);
-            drawCanvas.addEventListener('pointerup', stopDrawing);
-            drawCanvas.addEventListener('pointercancel', stopDrawing);
-            drawCanvas.addEventListener('pointerleave', stopDrawing);
+            drawCanvas.addEventListener('pointerdown', (e) => { pointerEventSeen = true; startDrawing(e); }, { passive: false });
+            drawCanvas.addEventListener('pointermove', draw, { passive: false });
+            drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
+            drawCanvas.addEventListener('pointercancel', stopDrawing, { passive: false });
+            drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
         }
 
         // Always add touch/mouse fallback: ignored if pointer events already active
@@ -935,9 +935,14 @@
         drawCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
         drawCanvas.addEventListener('touchend', handleTouchEnd, { passive: false });
         drawCanvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-        drawCanvas.addEventListener('mousedown', handleMouseDown);
-        drawCanvas.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        drawCanvas.addEventListener('mousedown', handleMouseDown, { passive: false });
+        drawCanvas.addEventListener('mousemove', handleMouseMove, { passive: false });
+        document.addEventListener('mouseup', handleMouseUp, { passive: false });
+
+        // Global safety reset in case a pointerup/cancel is missed (some mobile browsers)
+        window.addEventListener('pointerup', () => forceResetPointerState('window pointerup'), { passive: false });
+        window.addEventListener('pointercancel', () => forceResetPointerState('window pointercancel'), { passive: false });
+        window.addEventListener('blur', () => forceResetPointerState('window blur'), { passive: true });
 
         // Prevent context menu on long press
         drawCanvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -2074,15 +2079,40 @@
         stopDrawing(mouseToPointerEvent(e));
     }
 
+    function forceResetPointerState(reason) {
+        if (state.isDrawing || state.isPanning || state.isDraggingObject || state.isResizing || state.isDrawingShape) {
+            console.log('Resetting pointer state:', reason, {
+                pointerId: state.currentPointerId,
+                activeTool: state.activeTool,
+                isDrawing: state.isDrawing,
+                isPanning: state.isPanning
+            });
+        }
+        state.isDrawing = false;
+        state.isPanning = false;
+        state.isDraggingObject = false;
+        state.isResizing = false;
+        state.isDrawingShape = false;
+        state.resizeHandle = null;
+        state.resizeOriginalBounds = null;
+        state.currentPointerId = null;
+        drawCanvas.style.cursor = 'crosshair';
+    }
+
     // Drawing functions
     function startDrawing(e, options = {}) {
         const skipPointerCapture = Boolean(options.skipPointerCapture);
         e.preventDefault();
         
-        // Only handle one pointer at a time
+        // Only handle one pointer at a time; if a pointer got stuck, allow a fresh one when idle
         if (state.currentPointerId !== null && state.currentPointerId !== e.pointerId) {
-            console.log('Ignoring pointer - already tracking', state.currentPointerId);
-            return;
+            const isIdle = !state.isDrawing && !state.isPanning && !state.isDraggingObject && !state.isResizing && !state.isDrawingShape;
+            if (isIdle) {
+                state.currentPointerId = e.pointerId;
+            } else {
+                console.log('Ignoring pointer - already tracking', state.currentPointerId);
+                return;
+            }
         }
         
         state.currentPointerId = e.pointerId;
