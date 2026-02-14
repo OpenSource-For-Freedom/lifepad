@@ -2075,6 +2075,10 @@
         if (supportsPointerEvents && pointerEventSeen) return;
         const pe = touchToPointerEvent(e);
         if (!pe) return;
+        // Some Samsung Internet builds occasionally skip touchstart; kick off drawing on first move
+        if (!state.isDrawing && (state.activeTool === 'brush' || state.activeTool === 'eraser')) {
+            startDrawing(pe, { skipPointerCapture: true });
+        }
         draw(pe);
     }
 
@@ -2960,12 +2964,10 @@
         }
         ensureDefaultGradientStops();
         
-        // Load menu collapsed state
-        const savedMenuCollapsed = localStorage.getItem('lifepad-menu-collapsed');
-        if (savedMenuCollapsed === 'true') {
-            state.menuCollapsed = true;
-            document.getElementById('app').classList.add('menu-collapsed');
-        }
+        // Always start with menu expanded (avoid stale collapsed state on tablets)
+        state.menuCollapsed = false;
+        document.getElementById('app').classList.remove('menu-collapsed');
+        localStorage.removeItem('lifepad-menu-collapsed');
         updateCurrentColor();
         
         // Load canvas
