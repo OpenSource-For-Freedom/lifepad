@@ -20,10 +20,11 @@
         maxHistory: 30,
         paperMode: false,
         theme: 'light',
-        activeTool: 'brush', // 'brush', 'eraser', 'select', 'text', 'shape', 'pan'
+        activeTool: 'brush', // 'brush', 'eraser', 'select', 'text', 'shape', 'pan', 'fill'
         activeShape: null, // 'rectangle', 'circle', 'ellipse', 'line', 'arrow', 'triangle', 'diamond', 'star'
         shapeFill: false,
         shapeHandDrawn: false,
+        shapeReshapeEnabled: false,
         isDrawingShape: false,
         shapeStartX: 0,
         shapeStartY: 0,
@@ -40,11 +41,16 @@
         dragOriginalY1: 0,
         dragOriginalX2: 0,
         dragOriginalY2: 0,
+        dragOriginalCX: 0,
+        dragOriginalCY: 0,
         isResizing: false,
         resizeHandle: null,
         resizeStartX: 0,
         resizeStartY: 0,
         resizeOriginalBounds: null,
+        pinchActive: false,
+        pinchStartDist: 0,
+        pinchStartBounds: null,
         // Zoom and pan state - view transform
         zoom: 1.0,           // Current zoom level (1.0 to 1.7)
         panX: 0,             // Pan offset X in CSS pixels
@@ -253,7 +259,7 @@
     // PWA install elements
     let installBtn, iosInstallModal, closeIosInstall;
     // Text and select tool elements
-    let selectToolBtn, textToolBtn, textDialog, textInput, textConfirmBtn, textCancelBtn;
+    let selectToolBtn, textToolBtn, fillToolBtn, textDialog, textInput, textConfirmBtn, textCancelBtn;
     // Pan tool element
     let panToolBtn;
     // Background image input
@@ -354,6 +360,7 @@
         // Text and select tool elements
         selectToolBtn = document.getElementById('select-tool');
         textToolBtn = document.getElementById('text-tool');
+        fillToolBtn = document.getElementById('fill-tool');
         panToolBtn = document.getElementById('pan-tool');
         textDialog = document.getElementById('text-dialog');
         textInput = document.getElementById('text-input');
@@ -868,6 +875,7 @@
         // Tool selection
         selectToolBtn.addEventListener('click', activateSelectTool);
         textToolBtn.addEventListener('click', activateTextTool);
+        fillToolBtn.addEventListener('click', activateFillTool);
         panToolBtn.addEventListener('click', activatePanTool);
         
         // Background image import
@@ -885,8 +893,10 @@
             console.log('Shape fill:', state.shapeFill);
         });
         shapeRoughCheckbox.addEventListener('change', function() {
-            state.shapeHandDrawn = this.checked;
-            console.log('Shape hand-drawn:', state.shapeHandDrawn);
+            state.shapeReshapeEnabled = this.checked;
+            // Disable legacy hand-drawn effect when repurposed
+            state.shapeHandDrawn = false;
+            console.log('Shape reshape mode:', state.shapeReshapeEnabled);
         });
 
         // Text dialog
@@ -1787,6 +1797,15 @@
         updateToolStatus();
         showToast('Text tool activated - click to place text');
     }
+
+    function activateFillTool() {
+        state.activeTool = 'fill';
+        state.activeShape = null;
+        state.isEraser = false;
+        updateToolButtons();
+        updateToolStatus();
+        showToast('Fill tool activated - tap an area to bucket-fill');
+    }
     
     function activatePanTool() {
         state.activeTool = 'pan';
@@ -1802,6 +1821,7 @@
         brushEraserToggle.classList.remove('active');
         selectToolBtn.classList.remove('active');
         textToolBtn.classList.remove('active');
+        fillToolBtn.classList.remove('active');
         panToolBtn.classList.remove('active');
         
         // Set active state for current tool
@@ -1811,6 +1831,8 @@
             selectToolBtn.classList.add('active');
         } else if (state.activeTool === 'text') {
             textToolBtn.classList.add('active');
+        } else if (state.activeTool === 'fill') {
+            fillToolBtn.classList.add('active');
         } else if (state.activeTool === 'pan') {
             panToolBtn.classList.add('active');
         } else if (state.activeTool === 'shape') {
@@ -1832,6 +1854,8 @@
             statusText += 'Select';
         } else if (state.activeTool === 'text') {
             statusText += 'Text';
+        } else if (state.activeTool === 'fill') {
+            statusText += 'Fill';
         } else if (state.activeTool === 'pan') {
             statusText += 'Pan';
         } else {
@@ -2051,11 +2075,26 @@
         if (supportsPointerEvents && pointerEventSeen) return; // Pointer events already working
         const pe = touchToPointerEvent(e);
         if (!pe) return;
+        // If using select+shapes panel with two touches, prefer pinch instead of drawing
+        if (canPinchResizeShape() && e.touches && e.touches.length >= 2) {
+            startPinchResize(e);
+            return;
+        }
         startDrawing(pe, { skipPointerCapture: true });
     }
 
     function handleTouchMove(e) {
         if (supportsPointerEvents && pointerEventSeen) return;
+        // Pinch-resize shapes when select tool is active and panel is open
+        if (canPinchResizeShape() && e.touches.length >= 2) {
+            if (!state.pinchActive) {
+                if (!startPinchResize(e)) return;
+            } else {
+                updatePinchResize(e);
+            }
+            return;
+        }
+
         const pe = touchToPointerEvent(e);
         if (!pe) return;
         // Some Samsung Internet builds occasionally skip touchstart; kick off drawing on first move
@@ -2067,6 +2106,10 @@
 
     function handleTouchEnd(e) {
         if (supportsPointerEvents && pointerEventSeen) return;
+        if (state.pinchActive) {
+            endPinchResize();
+            return;
+        }
         const pe = touchToPointerEvent(e);
         if (!pe) return;
         stopDrawing(pe);
@@ -2102,8 +2145,174 @@
         state.isDrawingShape = false;
         state.resizeHandle = null;
         state.resizeOriginalBounds = null;
+        state.pinchActive = false;
+        state.pinchStartDist = 0;
+        state.pinchStartBounds = null;
         state.currentPointerId = null;
         drawCanvas.style.cursor = 'crosshair';
+    }
+
+    function isShapesPanelOpen() {
+        return shapesPanel && !shapesPanel.classList.contains('hidden');
+    }
+
+    function canPinchResizeShape() {
+        return state.activeTool === 'select'
+            && state.selectedObject
+            && state.selectedObject.type === 'shape'
+            && isShapesPanelOpen()
+            && state.shapeReshapeEnabled;
+    }
+
+    function startPinchResize(e) {
+        if (!canPinchResizeShape()) return false;
+        if (e.touches.length < 2) return false;
+        const rect = drawCanvas.getBoundingClientRect();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const p1 = screenToWorld(t1.clientX - rect.left, t1.clientY - rect.top);
+        const p2 = screenToWorld(t2.clientX - rect.left, t2.clientY - rect.top);
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy);
+        if (!dist) return false;
+        state.pinchActive = true;
+        state.pinchStartDist = dist;
+        state.pinchStartBounds = { ...state.selectedObject };
+        e.preventDefault();
+        return true;
+    }
+
+    function updatePinchResize(e) {
+        if (!state.pinchActive || !state.pinchStartBounds || e.touches.length < 2) return;
+        const rect = drawCanvas.getBoundingClientRect();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const p1 = screenToWorld(t1.clientX - rect.left, t1.clientY - rect.top);
+        const p2 = screenToWorld(t2.clientX - rect.left, t2.clientY - rect.top);
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const dist = Math.hypot(dx, dy);
+        if (!dist || !state.selectedObject) return;
+        const scale = Math.min(Math.max(dist / state.pinchStartDist, 0.2), 5);
+
+        const bounds = state.pinchStartBounds;
+        const centerX = (bounds.x1 + bounds.x2) / 2;
+        const centerY = (bounds.y1 + bounds.y2) / 2;
+        const halfW = (Math.abs(bounds.x2 - bounds.x1) / 2) * scale;
+        const halfH = (Math.abs(bounds.y2 - bounds.y1) / 2) * scale;
+
+        state.selectedObject.x1 = centerX - halfW;
+        state.selectedObject.x2 = centerX + halfW;
+        state.selectedObject.y1 = centerY - halfH;
+        state.selectedObject.y2 = centerY + halfH;
+
+        redrawCanvas();
+        e.preventDefault();
+    }
+
+    function endPinchResize() {
+        if (!state.pinchActive) return;
+        state.pinchActive = false;
+        state.pinchStartDist = 0;
+        state.pinchStartBounds = null;
+        saveHistoryState();
+        saveCanvasToStorage();
+    }
+
+    // Get current brush color as RGBA components for pixel operations
+    function getCurrentFillRgba() {
+        const shifted = ColorUtils.shiftHue(state.baseColor, state.hueShift);
+        const rgb = ColorUtils.hexToRgb(shifted) || { r: 0, g: 0, b: 0 };
+        const a = Math.round(ColorUtils.clamp(state.alpha, 0, 1) * 255);
+        return {
+            r: Math.round(rgb.r),
+            g: Math.round(rgb.g),
+            b: Math.round(rgb.b),
+            a
+        };
+    }
+
+    // Simple bucket fill on the drawing canvas (does not affect background layer)
+    function bucketFillAt(x, y) {
+        const dpr = window.devicePixelRatio || 1;
+        const px = Math.floor(x * dpr);
+        const py = Math.floor(y * dpr);
+        const width = drawCanvas.width;
+        const height = drawCanvas.height;
+        if (px < 0 || py < 0 || px >= width || py >= height) return;
+
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+        const startIdx = (py * width + px) * 4;
+        const target = [data[startIdx], data[startIdx + 1], data[startIdx + 2], data[startIdx + 3]];
+        const fill = getCurrentFillRgba();
+
+        const colorsMatch = (idx) =>
+            data[idx] === target[0] &&
+            data[idx + 1] === target[1] &&
+            data[idx + 2] === target[2] &&
+            data[idx + 3] === target[3];
+
+        const setColor = (idx) => {
+            data[idx] = fill.r;
+            data[idx + 1] = fill.g;
+            data[idx + 2] = fill.b;
+            data[idx + 3] = fill.a;
+        };
+
+        // No-op if target color already equals fill color
+        if (colorsMatch(startIdx) && fill.r === target[0] && fill.g === target[1] && fill.b === target[2] && fill.a === target[3]) {
+            return;
+        }
+
+        const stack = [[px, py]];
+
+        while (stack.length) {
+            const [sx, sy] = stack.pop();
+            let xLeft = sx;
+            let idx = (sy * width + xLeft) * 4;
+
+            // Move left to start of span
+            while (xLeft >= 0 && colorsMatch(idx)) {
+                xLeft--;
+                idx -= 4;
+            }
+            xLeft++;
+            idx += 4;
+
+            let reachedLeft = false;
+            let reachedRight = false;
+
+            // Fill the span to the right
+            for (let xPos = xLeft; xPos < width && colorsMatch(idx); xPos++, idx += 4) {
+                setColor(idx);
+
+                // Check pixel above
+                if (sy > 0) {
+                    const aboveIdx = idx - width * 4;
+                    if (colorsMatch(aboveIdx)) {
+                        if (!reachedLeft) stack.push([xPos, sy - 1]);
+                        reachedLeft = true;
+                    } else if (reachedLeft) {
+                        reachedLeft = false;
+                    }
+                }
+
+                // Check pixel below
+                if (sy < height - 1) {
+                    const belowIdx = idx + width * 4;
+                    if (colorsMatch(belowIdx)) {
+                        if (!reachedRight) stack.push([xPos, sy + 1]);
+                        reachedRight = true;
+                    } else if (reachedRight) {
+                        reachedRight = false;
+                    }
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
     }
 
     // Drawing functions
@@ -2159,6 +2368,15 @@
             return;
         }
 
+        // Handle fill tool (bucket fill)
+        if (state.activeTool === 'fill') {
+            saveHistoryState();
+            bucketFillAt(x, y);
+            saveCanvasToStorage();
+            state.currentPointerId = null;
+            return;
+        }
+
         // Handle text tool
         if (state.activeTool === 'text') {
             state.textX = x;
@@ -2174,6 +2392,11 @@
             const selectedObj = findObjectAt(x, y);
             if (selectedObj) {
                 state.selectedObject = selectedObj;
+                // Ensure curved shapes have a stored control point for manipulation
+                if ((selectedObj.shape === 'line' || selectedObj.shape === 'arrow') && (!Number.isFinite(selectedObj.controlX) || !Number.isFinite(selectedObj.controlY))) {
+                    selectedObj.controlX = (selectedObj.x1 + selectedObj.x2) / 2;
+                    selectedObj.controlY = (selectedObj.y1 + selectedObj.y2) / 2;
+                }
                 // Check if clicking on a resize handle
                 const handle = getResizeHandleAt(x, y, selectedObj);
                 if (handle) {
@@ -2185,7 +2408,9 @@
                         x1: selectedObj.x1,
                         y1: selectedObj.y1,
                         x2: selectedObj.x2,
-                        y2: selectedObj.y2
+                        y2: selectedObj.y2,
+                        controlX: Number.isFinite(selectedObj.controlX) ? selectedObj.controlX : (selectedObj.x1 + selectedObj.x2) / 2,
+                        controlY: Number.isFinite(selectedObj.controlY) ? selectedObj.controlY : (selectedObj.y1 + selectedObj.y2) / 2
                     };
                 } else {
                     state.isDraggingObject = true;
@@ -2195,6 +2420,8 @@
                     state.dragOriginalY1 = selectedObj.y1;
                     state.dragOriginalX2 = selectedObj.x2;
                     state.dragOriginalY2 = selectedObj.y2;
+                    state.dragOriginalCX = selectedObj.controlX ?? ((selectedObj.x1 + selectedObj.x2) / 2);
+                    state.dragOriginalCY = selectedObj.controlY ?? ((selectedObj.y1 + selectedObj.y2) / 2);
                 }
                 redrawCanvas();
             } else {
@@ -2294,6 +2521,10 @@
             state.selectedObject.y1 = state.dragOriginalY1 + deltaY;
             state.selectedObject.x2 = state.dragOriginalX2 + deltaX;
             state.selectedObject.y2 = state.dragOriginalY2 + deltaY;
+            if (state.selectedObject.controlX !== undefined && state.selectedObject.controlY !== undefined) {
+                state.selectedObject.controlX = state.dragOriginalCX + deltaX;
+                state.selectedObject.controlY = state.dragOriginalCY + deltaY;
+            }
             
             redrawCanvas();
             return;
@@ -2307,28 +2538,44 @@
             const handle = state.resizeHandle;
             const obj = state.selectedObject;
             const orig = state.resizeOriginalBounds;
+            const origControlX = Number.isFinite(orig.controlX) ? orig.controlX : (orig.x1 + orig.x2) / 2;
+            const origControlY = Number.isFinite(orig.controlY) ? orig.controlY : (orig.y1 + orig.y2) / 2;
             
-            // Update bounds based on which handle is being dragged
-            if (handle === 'nw') {
-                obj.x1 = orig.x1 + deltaX;
-                obj.y1 = orig.y1 + deltaY;
-            } else if (handle === 'ne') {
-                obj.x2 = orig.x2 + deltaX;
-                obj.y1 = orig.y1 + deltaY;
-            } else if (handle === 'sw') {
-                obj.x1 = orig.x1 + deltaX;
-                obj.y2 = orig.y2 + deltaY;
-            } else if (handle === 'se') {
-                obj.x2 = orig.x2 + deltaX;
-                obj.y2 = orig.y2 + deltaY;
-            } else if (handle === 'n') {
-                obj.y1 = orig.y1 + deltaY;
-            } else if (handle === 's') {
-                obj.y2 = orig.y2 + deltaY;
-            } else if (handle === 'e') {
-                obj.x2 = orig.x2 + deltaX;
-            } else if (handle === 'w') {
-                obj.x1 = orig.x1 + deltaX;
+            // Line/arrow: manipulate endpoints or midpoint
+            if ((obj.shape === 'line' || obj.shape === 'arrow') && (handle === 'p1' || handle === 'p2' || handle === 'c')) {
+                if (handle === 'p1') {
+                    obj.x1 = orig.x1 + deltaX;
+                    obj.y1 = orig.y1 + deltaY;
+                } else if (handle === 'p2') {
+                    obj.x2 = orig.x2 + deltaX;
+                    obj.y2 = orig.y2 + deltaY;
+                } else if (handle === 'c') {
+                    obj.controlX = origControlX + deltaX;
+                    obj.controlY = origControlY + deltaY;
+                }
+            } else {
+                // Update bounds based on which handle is being dragged
+                if (handle === 'nw') {
+                    obj.x1 = orig.x1 + deltaX;
+                    obj.y1 = orig.y1 + deltaY;
+                } else if (handle === 'ne') {
+                    obj.x2 = orig.x2 + deltaX;
+                    obj.y1 = orig.y1 + deltaY;
+                } else if (handle === 'sw') {
+                    obj.x1 = orig.x1 + deltaX;
+                    obj.y2 = orig.y2 + deltaY;
+                } else if (handle === 'se') {
+                    obj.x2 = orig.x2 + deltaX;
+                    obj.y2 = orig.y2 + deltaY;
+                } else if (handle === 'n') {
+                    obj.y1 = orig.y1 + deltaY;
+                } else if (handle === 's') {
+                    obj.y2 = orig.y2 + deltaY;
+                } else if (handle === 'e') {
+                    obj.x2 = orig.x2 + deltaX;
+                } else if (handle === 'w') {
+                    obj.x1 = orig.x1 + deltaX;
+                }
             }
             
             redrawCanvas();
@@ -3130,7 +3377,7 @@
             overlayCtx.fillStyle = state.currentColor;
         }
         
-        drawShapeGeometry(overlayCtx, x1, y1, x2, y2, width, height, shape, state.shapeFill);
+        drawShapeGeometry(overlayCtx, x1, y1, x2, y2, width, height, shape, state.shapeFill, (x1 + x2) / 2, (y1 + y2) / 2);
         
         overlayCtx.globalAlpha = 1;
     }
@@ -3149,12 +3396,7 @@
             ctx.fillStyle = state.currentColor;
         }
         
-        drawShapeGeometry(ctx, x1, y1, x2, y2, width, height, shape, state.shapeFill);
-        
-        // Apply hand-drawn effect if enabled
-        if (state.shapeHandDrawn) {
-            applyHandDrawnEffect(ctx, x1, y1, x2, y2, width, height, shape);
-        }
+        drawShapeGeometry(ctx, x1, y1, x2, y2, width, height, shape, state.shapeFill, (x1 + x2) / 2, (y1 + y2) / 2);
         
         // Store shape object for later selection/manipulation
         const shapeObj = {
@@ -3167,12 +3409,14 @@
             color: state.currentColor,
             lineWidth: state.currentSize,
             fill: state.shapeFill,
-            handDrawn: state.shapeHandDrawn
+            controlX: (shape === 'line' || shape === 'arrow') ? (x1 + x2) / 2 : undefined,
+            controlY: (shape === 'line' || shape === 'arrow') ? (y1 + y2) / 2 : undefined,
+            handDrawn: false
         };
         state.objects.push(shapeObj);
     }
 
-    function drawShapeGeometry(context, x1, y1, x2, y2, width, height, shape, fill) {
+    function drawShapeGeometry(context, x1, y1, x2, y2, width, height, shape, fill, controlX, controlY) {
         switch (shape) {
             case 'rectangle':
                 if (fill) {
@@ -3198,24 +3442,32 @@
                 }
                 break;
                 
-            case 'line':
+            case 'line': {
+                const cx = Number.isFinite(controlX) ? controlX : (x1 + x2) / 2;
+                const cy = Number.isFinite(controlY) ? controlY : (y1 + y2) / 2;
                 context.beginPath();
                 context.moveTo(x1, y1);
-                context.lineTo(x2, y2);
+                context.quadraticCurveTo(cx, cy, x2, y2);
                 context.stroke();
                 break;
+            }
                 
-            case 'arrow':
-                const angle = Math.atan2(y2 - y1, x2 - x1);
+            case 'arrow': {
+                const cx = Number.isFinite(controlX) ? controlX : (x1 + x2) / 2;
+                const cy = Number.isFinite(controlY) ? controlY : (y1 + y2) / 2;
                 const headLength = Math.min(20, Math.abs(width) / 3, Math.abs(height) / 3);
                 
-                // Draw line
+                // Draw curved shaft
                 context.beginPath();
                 context.moveTo(x1, y1);
-                context.lineTo(x2, y2);
+                context.quadraticCurveTo(cx, cy, x2, y2);
                 context.stroke();
+
+                // Arrowhead aligned to curve tangent at end (derivative of quadratic at t=1)
+                const dx = x2 - cx;
+                const dy = y2 - cy;
+                const angle = Math.atan2(dy, dx);
                 
-                // Draw arrowhead
                 context.beginPath();
                 context.moveTo(x2, y2);
                 context.lineTo(
@@ -3229,6 +3481,7 @@
                 );
                 context.stroke();
                 break;
+            }
                 
             case 'triangle':
                 context.beginPath();
@@ -4409,6 +4662,17 @@
     function getResizeHandleAt(x, y, obj) {
         if (!obj || obj.type !== 'shape') return null;
         
+        if (obj.shape === 'line' || obj.shape === 'arrow') {
+            // Endpoint handles
+            const cx = Number.isFinite(obj.controlX) ? obj.controlX : (obj.x1 + obj.x2) / 2;
+            const cy = Number.isFinite(obj.controlY) ? obj.controlY : (obj.y1 + obj.y2) / 2;
+            if (Math.abs(x - obj.x1) <= RESIZE_HANDLE_SIZE && Math.abs(y - obj.y1) <= RESIZE_HANDLE_SIZE) return 'p1';
+            if (Math.abs(x - obj.x2) <= RESIZE_HANDLE_SIZE && Math.abs(y - obj.y2) <= RESIZE_HANDLE_SIZE) return 'p2';
+            // Control handle for bending line/arrow
+            if (Math.abs(x - cx) <= RESIZE_HANDLE_SIZE && Math.abs(y - cy) <= RESIZE_HANDLE_SIZE) return 'c';
+            return null;
+        }
+        
         const x1 = Math.min(obj.x1, obj.x2);
         const y1 = Math.min(obj.y1, obj.y2);
         const x2 = Math.max(obj.x1, obj.x2);
@@ -4471,7 +4735,7 @@
             ctx.fillStyle = obj.color;
         }
         
-        drawShapeGeometry(ctx, obj.x1, obj.y1, obj.x2, obj.y2, width, height, obj.shape, obj.fill);
+        drawShapeGeometry(ctx, obj.x1, obj.y1, obj.x2, obj.y2, width, height, obj.shape, obj.fill, obj.controlX, obj.controlY);
         
         // Apply hand-drawn effect if enabled
         if (obj.handDrawn) {
@@ -4506,28 +4770,47 @@
         const cx = (x1 + x2) / 2;
         const cy = (y1 + y2) / 2;
         
-        // Draw bounding box
-        overlayCtx.strokeStyle = SELECTION_COLOR;
         overlayCtx.lineWidth = 2;
-        overlayCtx.setLineDash([5, 5]);
-        overlayCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-        overlayCtx.setLineDash([]);
-        
-        // Draw handles
+        overlayCtx.strokeStyle = SELECTION_COLOR;
         overlayCtx.fillStyle = '#ffffff';
-        overlayCtx.strokeStyle = SELECTION_COLOR;
-        overlayCtx.lineWidth = 2;
-        
-        const handles = [
-            [x1, y1], [cx, y1], [x2, y1],
-            [x1, cy],           [x2, cy],
-            [x1, y2], [cx, y2], [x2, y2]
-        ];
-        
-        handles.forEach(([hx, hy]) => {
-            overlayCtx.fillRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
-            overlayCtx.strokeRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
-        });
+
+        if (obj.shape === 'line' || obj.shape === 'arrow') {
+            const cxLine = Number.isFinite(obj.controlX) ? obj.controlX : (obj.x1 + obj.x2) / 2;
+            const cyLine = Number.isFinite(obj.controlY) ? obj.controlY : (obj.y1 + obj.y2) / 2;
+
+            // Draw curved overlay
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(obj.x1, obj.y1);
+            overlayCtx.quadraticCurveTo(cxLine, cyLine, obj.x2, obj.y2);
+            overlayCtx.stroke();
+
+            const points = [
+                [obj.x1, obj.y1],
+                [cxLine, cyLine],
+                [obj.x2, obj.y2]
+            ];
+            points.forEach(([hx, hy]) => {
+                overlayCtx.fillRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+                overlayCtx.strokeRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+            });
+        } else {
+            // Draw bounding box
+            overlayCtx.setLineDash([5, 5]);
+            overlayCtx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+            overlayCtx.setLineDash([]);
+            
+            // Draw handles
+            const handles = [
+                [x1, y1], [cx, y1], [x2, y1],
+                [x1, cy],           [x2, cy],
+                [x1, y2], [cx, y2], [x2, y2]
+            ];
+            
+            handles.forEach(([hx, hy]) => {
+                overlayCtx.fillRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+                overlayCtx.strokeRect(hx - RESIZE_HANDLE_SIZE / 2, hy - RESIZE_HANDLE_SIZE / 2, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE);
+            });
+        }
     }
 
     // ============================================
