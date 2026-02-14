@@ -2259,6 +2259,15 @@
         
         // Send cursor position to peer (throttled)
         sendCursorUpdate(e);
+
+        // Some Samsung builds occasionally miss pointerdown; start on first move if we are idle
+        const brushLike = state.activeTool === 'brush' || state.activeTool === 'eraser';
+        if (supportsPointerEvents && brushLike && state.currentPointerId === null) {
+            const hasContact = (e.pointerType === 'touch') || (e.buttons & 1) || (e.pressure > 0);
+            if (hasContact) {
+                startDrawing(e);
+            }
+        }
         
         // Only handle the tracked pointer
         if (state.currentPointerId !== e.pointerId) {
