@@ -612,25 +612,8 @@
 
     // Event listeners setup
     function setupEventListeners() {
-        // Lightweight on-screen input debug for field testing
-        const dbg = document.createElement('div');
-        dbg.id = 'input-debug';
-        dbg.style.position = 'fixed';
-        dbg.style.top = '8px';
-        dbg.style.right = '8px';
-        dbg.style.zIndex = '2000';
-        dbg.style.background = 'rgba(0,0,0,0.65)';
-        dbg.style.color = '#fff';
-        dbg.style.font = '12px sans-serif';
-        dbg.style.padding = '6px 8px';
-        dbg.style.borderRadius = '6px';
-        dbg.style.pointerEvents = 'none';
-        dbg.style.maxWidth = '180px';
-        dbg.textContent = 'Input debug ready';
-        document.body.appendChild(dbg);
-        const logInput = (msg) => {
-            dbg.textContent = msg;
-        };
+        // Input debug overlay disabled in production
+        const logInput = () => {};
 
         // Walkthrough modal
         closeWalkthroughBtn.addEventListener('click', closeWalkthrough);
@@ -2269,6 +2252,14 @@
             }
         }
         
+        // If we somehow started drawing but lost the pointer id (seen on some touch stacks), re-associate it
+        if (state.isDrawing && state.currentPointerId === null) {
+            state.currentPointerId = e.pointerId;
+        }
+        // On certain touch implementations, the id can flip; allow touch to rebind while drawing
+        if (state.isDrawing && e.pointerType === 'touch' && state.currentPointerId !== e.pointerId) {
+            state.currentPointerId = e.pointerId;
+        }
         // Only handle the tracked pointer
         if (state.currentPointerId !== e.pointerId) {
             return;
