@@ -612,6 +612,26 @@
 
     // Event listeners setup
     function setupEventListeners() {
+        // Lightweight on-screen input debug for field testing
+        const dbg = document.createElement('div');
+        dbg.id = 'input-debug';
+        dbg.style.position = 'fixed';
+        dbg.style.top = '8px';
+        dbg.style.right = '8px';
+        dbg.style.zIndex = '2000';
+        dbg.style.background = 'rgba(0,0,0,0.65)';
+        dbg.style.color = '#fff';
+        dbg.style.font = '12px sans-serif';
+        dbg.style.padding = '6px 8px';
+        dbg.style.borderRadius = '6px';
+        dbg.style.pointerEvents = 'none';
+        dbg.style.maxWidth = '180px';
+        dbg.textContent = 'Input debug ready';
+        document.body.appendChild(dbg);
+        const logInput = (msg) => {
+            dbg.textContent = msg;
+        };
+
         // Walkthrough modal
         closeWalkthroughBtn.addEventListener('click', closeWalkthrough);
         walkthroughPrevBtn.addEventListener('click', prevWalkthroughSlide);
@@ -923,21 +943,21 @@
 
         // Drawing events – attach pointer; also attach touch/mouse as safety net
         if (supportsPointerEvents) {
-            drawCanvas.addEventListener('pointerdown', (e) => { pointerEventSeen = true; startDrawing(e); }, { passive: false });
-            drawCanvas.addEventListener('pointermove', draw, { passive: false });
-            drawCanvas.addEventListener('pointerup', stopDrawing, { passive: false });
-            drawCanvas.addEventListener('pointercancel', stopDrawing, { passive: false });
-            drawCanvas.addEventListener('pointerleave', stopDrawing, { passive: false });
+            drawCanvas.addEventListener('pointerdown', (e) => { pointerEventSeen = true; logInput(`pointerdown ${e.pointerType} id:${e.pointerId}`); startDrawing(e); }, { passive: false });
+            drawCanvas.addEventListener('pointermove', (e) => { logInput(`move ${e.pointerType} id:${e.pointerId} drawing:${state.isDrawing}`); draw(e); }, { passive: false });
+            drawCanvas.addEventListener('pointerup', (e) => { logInput(`up ${e.pointerType} id:${e.pointerId}`); stopDrawing(e); }, { passive: false });
+            drawCanvas.addEventListener('pointercancel', (e) => { logInput(`cancel ${e.pointerType} id:${e.pointerId}`); stopDrawing(e); }, { passive: false });
+            drawCanvas.addEventListener('pointerleave', (e) => { logInput(`leave ${e.pointerType} id:${e.pointerId}`); stopDrawing(e); }, { passive: false });
         }
 
         // Always add touch/mouse fallback: ignored if pointer events already active
-        drawCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-        drawCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-        drawCanvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-        drawCanvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-        drawCanvas.addEventListener('mousedown', handleMouseDown, { passive: false });
-        drawCanvas.addEventListener('mousemove', handleMouseMove, { passive: false });
-        document.addEventListener('mouseup', handleMouseUp, { passive: false });
+        drawCanvas.addEventListener('touchstart', (e) => { logInput('touchstart'); handleTouchStart(e); }, { passive: false });
+        drawCanvas.addEventListener('touchmove', (e) => { logInput(`touchmove drawing:${state.isDrawing}`); handleTouchMove(e); }, { passive: false });
+        drawCanvas.addEventListener('touchend', (e) => { logInput('touchend'); handleTouchEnd(e); }, { passive: false });
+        drawCanvas.addEventListener('touchcancel', (e) => { logInput('touchcancel'); handleTouchEnd(e); }, { passive: false });
+        drawCanvas.addEventListener('mousedown', (e) => { logInput('mousedown'); handleMouseDown(e); }, { passive: false });
+        drawCanvas.addEventListener('mousemove', (e) => { logInput(`mousemove drawing:${state.isDrawing}`); handleMouseMove(e); }, { passive: false });
+        document.addEventListener('mouseup', (e) => { logInput('mouseup'); handleMouseUp(e); }, { passive: false });
 
         // Global safety reset in case a pointerup/cancel is missed (some mobile browsers)
         window.addEventListener('pointerup', () => forceResetPointerState('window pointerup'), { passive: false });
